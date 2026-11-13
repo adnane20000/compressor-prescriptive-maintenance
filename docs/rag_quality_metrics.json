@@ -1,0 +1,149 @@
+{
+  "question_count": 7,
+  "answerable_count": 4,
+  "unanswerable_count": 3,
+  "hit_at_1": 1.0,
+  "hit_at_k": 1.0,
+  "mean_reciprocal_rank_at_k": 1.0,
+  "unanswerable_abstention_rate": 1.0,
+  "top_k": 3,
+  "min_similarity": 0.8,
+  "cases": [
+    {
+      "question": "Dans quelle unité est mesurée la température de l'huile ?",
+      "should_abstain": false,
+      "expected_references": [
+        {
+          "file": "Data Description_Metro.pdf",
+          "page": 2
+        }
+      ],
+      "status": "passages_found",
+      "reason": "retrieval_only",
+      "first_relevant_rank": 1,
+      "returned_references": [
+        {
+          "file": "Data Description_Metro.pdf",
+          "page": 2,
+          "similarity": 0.8013187646865845,
+          "authority": "official"
+        }
+      ]
+    },
+    {
+      "question": "Que mesure Motor Current et quelle est son unité ?",
+      "should_abstain": false,
+      "expected_references": [
+        {
+          "file": "Data Description_Metro.pdf",
+          "page": 2
+        }
+      ],
+      "status": "passages_found",
+      "reason": "retrieval_only",
+      "first_relevant_rank": 1,
+      "returned_references": [
+        {
+          "file": "Data Description_Metro.pdf",
+          "page": 2,
+          "similarity": 0.8116719722747803,
+          "authority": "official"
+        }
+      ]
+    },
+    {
+      "question": "À quoi correspond le signal TOWERS ?",
+      "should_abstain": false,
+      "expected_references": [
+        {
+          "file": "Data Description_Metro.pdf",
+          "page": 3
+        }
+      ],
+      "status": "passages_found",
+      "reason": "retrieval_only",
+      "first_relevant_rank": 1,
+      "returned_references": [
+        {
+          "file": "Data Description_Metro.pdf",
+          "page": 3,
+          "similarity": 0.8175437450408936,
+          "authority": "official"
+        }
+      ]
+    },
+    {
+      "question": "Que mesure TP2 et dans quelle unité ?",
+      "should_abstain": false,
+      "expected_references": [
+        {
+          "file": "Data Description_Metro.pdf",
+          "page": 2
+        }
+      ],
+      "status": "passages_found",
+      "reason": "retrieval_only",
+      "first_relevant_rank": 1,
+      "returned_references": [
+        {
+          "file": "Data Description_Metro.pdf",
+          "page": 2,
+          "similarity": 0.8110605478286743,
+          "authority": "official"
+        }
+      ]
+    },
+    {
+      "question": "Quel est le couple de serrage de la culasse ?",
+      "should_abstain": true,
+      "expected_references": [],
+      "status": "information_insuffisante",
+      "reason": "no_relevant_passage",
+      "first_relevant_rank": null,
+      "returned_references": []
+    },
+    {
+      "question": "Quelle procédure de consignation de sécurité appliquer avant démontage ?",
+      "should_abstain": true,
+      "expected_references": [],
+      "status": "information_insuffisante",
+      "reason": "no_relevant_passage",
+      "first_relevant_rank": null,
+      "returned_references": []
+    },
+    {
+      "question": "Quelle est la recette d'un gâteau au chocolat ?",
+      "should_abstain": true,
+      "expected_references": [],
+      "status": "information_insuffisante",
+      "reason": "no_relevant_passage",
+      "first_relevant_rank": null,
+      "returned_references": []
+    }
+  ],
+  "encoder": {
+    "model": "intfloat/multilingual-e5-small",
+    "revision": "614241f622f53c4eeff9890bdc4f31cfecc418b3",
+    "dimension": 384,
+    "normalization": "l2",
+    "prefixes": "query:/passage:-v1",
+    "max_tokens": 512
+  },
+  "corpus_inventory": [
+    {
+      "relative_path": "Data Description_Metro.pdf",
+      "sha256": "b00fac0e8899854078309bef4adaa480d82ecf14dc81c5097c3646973e824127"
+    }
+  ],
+  "indexed_pages": 3,
+  "indexed_chunks": 9,
+  "library_versions": {
+    "sentence-transformers": "5.7.0",
+    "chromadb": "1.5.9",
+    "PyMuPDF": "1.28.2",
+    "torch": "2.15.0+cpu"
+  },
+  "relevance_definition": "Correspondance au PDF et à la page annotés ; pas une vérification de réponse complète.",
+  "limits": "Petit jeu annoté : résultats locaux, sans généralisation aux manuels absents ni certification de suffisance.",
+  "scope": "Description officielle du dataset UCI uniquement ; aucun manuel constructeur, AMDEC ou procédure technique disponible."
+}

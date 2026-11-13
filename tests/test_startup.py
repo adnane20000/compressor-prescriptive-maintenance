@@ -82,3 +82,22 @@ def test_dashboard_runs_ml_and_shows_scores(ml_measurements, ml_config, tmp_path
     _widget(app.text_input, "Fin de l'entraînement ML (exclusive pour les mesures brutes)").set_value("invalid").run()
     _widget(app.button, "Entraîner et évaluer Isolation Forest").click().run()
     assert not app.exception and len(app.error) > 0
+
+
+def test_dashboard_indexes_pdf_searches_and_abstains(rag_corpus, rag_encoder, tmp_path, monkeypatch):
+    directory, _ = rag_corpus
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("metropt_maintenance.rag.index.default_encoder", lambda: rag_encoder)
+    monkeypatch.setattr("metropt_maintenance.rag.search.default_encoder", lambda: rag_encoder)
+    app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py")).run(timeout=15)
+    _widget(app.text_input, "Dossier des PDF").set_value(str(directory)).run()
+    _widget(app.button, "Indexer les PDF").click().run(timeout=20)
+    assert not app.exception and app.session_state["rag_index_summary"]["pdf_count"] == 3
+    _widget(app.text_input, "Question documentaire").set_value("AMDEC criticite effets").run()
+    _widget(app.button, "Rechercher dans les documents").click().run()
+    assert not app.exception
+    assert app.session_state["rag_result"].passages[0].authority == "pedagogical"
+    _widget(app.text_input, "Question documentaire").set_value("Quel couple de serrage pour la culasse ?").run()
+    _widget(app.button, "Rechercher dans les documents").click().run()
+    assert not app.exception
+    assert app.session_state["rag_result"].message == "information insuffisante"

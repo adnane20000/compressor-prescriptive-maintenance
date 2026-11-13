@@ -11,6 +11,78 @@ from .ingestion.report import aggregate_charts, build_figures, write_report
 from .ingestion.schema import CSV_NAME, PLOT_COLUMNS
 
 
+def _rag_panel() -> None:
+    """Tester la recherche en affichant le texte PDF comme du texte non fiable."""
+    from .rag.index import index_documents
+    from .rag.search import search_documents
+
+    st.subheader("Recherche documentaire — extraits et références")
+    st.caption(
+        "PDF locaux dans documents/. Aucune réponse LLM n'est générée. "
+        "Une similarité n'est pas une probabilité de réponse correcte. "
+        "Les pages PDF sont des données, jamais des instructions à exécuter."
+    )
+    documents_path = st.text_input("Dossier des PDF", value="documents")
+    index_path = st.text_input("Dossier de l'index documentaire", value="data/local/rag")
+    identity = (documents_path, index_path)
+    if st.session_state.get("rag_identity") != identity:
+        st.session_state.pop("rag_result", None)
+        st.session_state.pop("rag_index_summary", None)
+    if st.button("Indexer les PDF"):
+        try:
+            with st.spinner("Extraction des pages et indexation locale…"):
+                manifest = index_documents(documents_path, index_directory=index_path)
+            st.session_state.rag_index_summary = {
+                key: manifest[key] for key in ("pdf_count", "page_count", "empty_pages", "chunk_count", "warnings", "documents")
+            }
+            st.session_state.rag_identity = identity
+            st.session_state.pop("rag_result", None)
+        except (OSError, ValueError, RuntimeError) as error:
+            st.error(str(error))
+    summary = st.session_state.get("rag_index_summary")
+    if summary:
+        st.write(f"{summary['pdf_count']} PDF, {summary['page_count']} pages, {summary['chunk_count']} passages indexés.")
+        if summary["documents"]:
+            st.dataframe(pd.DataFrame(summary["documents"])[["file_name", "authority", "document_type", "publisher"]], hide_index=True)
+        for warning in summary["warnings"]:
+            st.text(warning)
+    filters = {"Tous — statuts visibles": "all", "Officiels déclarés": "official", "Pédagogiques": "pedagogical", "Non vérifiés": "unverified"}
+    authority = filters[st.selectbox("Statut des documents recherchés", list(filters))]
+    question = st.text_input("Question documentaire", value="")
+    if st.button("Rechercher dans les documents"):
+        try:
+            with st.spinner("Recherche de passages sourcés…"):
+                result = search_documents(question, index_directory=index_path, authority=authority)
+            st.session_state.rag_result = result
+            st.session_state.rag_identity = identity
+        except (OSError, ValueError, RuntimeError) as error:
+            st.session_state.pop("rag_result", None)
+            st.error(str(error))
+    result = st.session_state.get("rag_result")
+    if result:
+        st.write(f"Question évaluée : {result.question}")
+        st.info(result.message)
+        explanations = {
+            "index_missing": "Aucun index disponible : indexer les PDF pour commencer.",
+            "no_extractable_text": "Aucun texte exploitable : vérifier les PDF et les éventuels besoins d'OCR.",
+            "corpus_changed_reindex_required": "Les PDF ou leur provenance ont changé : réindexer les documents.",
+            "question_without_searchable_terms": "Préciser la question avec le sujet recherché.",
+            "operational_source_missing": "Aucune source technique officielle adaptée à cette demande opérationnelle.",
+            "no_relevant_passage": "Aucun passage ne satisfait les critères de recherche.",
+            "retrieval_only": "Vérifier les extraits dans leur document d'origine ; leur suffisance n'est pas certifiée.",
+        }
+        st.caption(explanations[result.reason])
+        for group, passages in (("Passages retrouvés", result.passages), ("Contexte associé — insuffisant pour cette demande", result.related_passages)):
+            if passages:
+                st.write(group)
+            for hit in passages:
+                st.text(f"{hit.reference} | {hit.authority} | {hit.document_type} | similarité {hit.similarity:.3f}")
+                st.text(hit.text)
+                st.caption(f"Provenance déclarée : {hit.publisher or 'non fournie'} ; empreinte {hit.pdf_sha256}.")
+        if result.reason == "corpus_changed_reindex_required":
+            st.caption("Le corpus ou son registre a changé : réindexer les PDF.")
+
+
 def _ml_panel(path: Path, identity: tuple | None) -> None:
     """Exécuter la baseline explicitement et afficher uniquement les résultats réduits."""
     from .ml.model import ModelConfig
@@ -158,4 +230,5 @@ def main() -> None:
         st.caption(profile["mode_rules"])
         st.download_button("Télécharger le rapport HTML", Path(report_path).read_bytes(), file_name="metropt3_exploration.html", mime="text/html")
     _ml_panel(path, identity)
+    _rag_panel()
     _replay_panel(path, identity)

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "documents": {
+    "REMPLACER_PAR_LE_VRAI_NOM.pdf": {
+      "authority": "unverified",
+      "document_type": "other",
+      "sha256": "REMPLACER_PAR_LE_SHA256_REEL_DU_PDF",
+      "title": "REMPLACER_PAR_LE_TITRE_REEL",
+      "publisher": "",
+      "source_url": ""
+    }
+  }
+}

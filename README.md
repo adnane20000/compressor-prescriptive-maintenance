@@ -1,8 +1,9 @@
-# MetroPT — exploration, anomalies ML et rejeu historique
+# MetroPT — anomalies ML et recherche documentaire
 
 Prototype académique de maintenance prescriptive du compresseur MetroPT-3.
 Le projet implémente l'acquisition CSV, l'exploration, les rapports avec graphiques,
-le rejeu chronologique et une baseline ML Isolation Forest sans clé API. Le RAG, le LLM,
+le rejeu chronologique, une baseline ML Isolation Forest et la recherche documentaire
+RAG sans clé API. Le LLM,
 LangGraph et les propositions de maintenance restent à implémenter.
 
 ## Installer et lancer
@@ -28,6 +29,16 @@ python -m streamlit run app.py --browser.gatherUsageStats=false
 Remplacer `-3.12` par `-3.11` si nécessaire. Si l'activation est bloquée,
 utiliser `.\.venv\Scripts\python.exe` à la place de `python`.
 Ouvrir l'adresse affichée, généralement <http://localhost:8501>.
+
+Pour une installation CPU sous Linux/Windows, installer PyTorch CPU **avant** les
+dépendances permet d'éviter les composants CUDA inutiles :
+
+```bash
+python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+python -m pip install -r requirements.txt
+```
+
+Sous macOS, conserver l'installation standard via `requirements.txt`.
 
 ## Acquérir les données
 
@@ -253,6 +264,85 @@ Le protocole, les limites, les métriques par mode et la comparaison aux rapport
 UCI sont détaillés dans `docs/ml_baseline.md`. Un instantané vérifiable des
 résultats réels figure dans `docs/ml_baseline_metrics.json`.
 
+## Recherche documentaire RAG
+
+Cette étape retrouve des extraits de PDF, avec leur fichier et leur page.
+Elle ne génère pas de réponse LLM et n'ajoute aucun agent autonome.
+
+1. Déposer les PDF autorisés dans `documents/`.
+2. Facultativement créer `documents/sources.json` à partir de l'exemple fourni,
+   en renseignant la provenance réelle et l'empreinte de chaque fichier.
+3. Préparer les poids publics du modèle d'embeddings, une seule fois avec Internet.
+4. Indexer les PDF puis rechercher une question.
+
+```bash
+python -m metropt_maintenance.rag prepare-model
+python -m metropt_maintenance.rag index --documents documents
+python -m metropt_maintenance.rag search "Dans quelle unité est mesurée la température de l'huile ?"
+```
+
+Le modèle local multilingue est `intfloat/multilingual-e5-small`, avec une révision
+fixée et des embeddings normalisés de 384 dimensions. Ses poids et caches restent
+dans `data/local/embedding_models/`. Après préparation, indexation et recherche
+fonctionnent sans clé API et hors ligne. Les textes des PDF ne sont pas envoyés à
+un service d'embeddings. Les commandes `index`, `search` et `evaluate` acceptent
+`--cache` si un autre dossier de poids a été utilisé pour `prepare-model`.
+
+Le dashboard propose **Indexer les PDF**, un filtre officiel/pédagogique/non
+vérifié et un champ **Question documentaire**. Aucun index ni modèle lourd n'est
+chargé au simple démarrage. Sans index ou sans résultat pertinent, la réponse est
+**« information insuffisante »**.
+
+```python
+from metropt_maintenance.rag import search_documents
+
+result = search_documents("Que mesure TP2 et dans quelle unité ?")
+print(result.message)
+for hit in result.passages:
+    print(hit.reference, hit.authority, hit.similarity)
+    print(hit.text)
+```
+
+Les références conservent le nom exact, le chemin relatif, la page physique
+(première page = 1), l'éventuel label PDF et son SHA-256. Les chunks de 900
+caractères avec chevauchement ne mélangent jamais deux pages. ChromaDB persiste
+localement dans `data/local/rag/`. L'index actif est remplacé après succès ; un
+échec d'encodage conserve l'ancien index. Réindexer après modification du corpus
+ou du registre : le moteur refuse de retourner les anciennes références.
+
+Un document n'est pas officiel parce que son texte l'affirme. Le statut vient
+d'un registre humain lié à son empreinte ; sans déclaration valide, il reste
+non vérifié. « Officiel déclaré » n'est pas une certification automatique.
+Une description de dataset et une note pédagogique ne valident aucune procédure
+de maintenance, de sécurité ou limite constructeur.
+
+La recherche combine similarité cosinus (seuil initial 0,80), présence d'ancres
+lexicales et garde-fous de type/provenance pour les demandes opérationnelles.
+Ce seuil est heuristique, sans calibration sur vos futurs manuels. La similarité
+n'est pas une probabilité de réponse correcte. `passages_found` signifie passages
+retrouvés, pas réponse complète certifiée ; `generated_answer` reste nul et
+`sufficiency_verified` reste faux. Certains refus peuvent être trop conservateurs.
+Les instructions, liens et scripts des PDF ne sont jamais exécutés.
+
+**Corpus actuellement vérifié :** uniquement le PDF officiel UCI décrivant le
+dataset, 3 pages et 9 passages. Aucun manuel constructeur, AMDEC ou procédure
+de sécurité n'a été fourni. La recherche ne peut donc pas établir de procédure
+technique applicable au compresseur.
+
+Les tests ordinaires utilisent de petits PDF et un encodeur **synthétiques**,
+sans téléchargement. Une évaluation séparée avec les vrais embeddings E5 a été
+exécutée sur le PDF UCI : 4 questions documentées sur 4 retrouvent la page attendue
+au premier rang, et 3 questions hors corpus sur 3 produisent une abstention.
+Ce petit test ne mesure pas la qualité sur des manuels absents.
+
+```bash
+python -m metropt_maintenance.rag evaluate tests/fixtures/rag_uci_questions.json
+```
+
+Protocole et limites : `docs/rag_retrieval.md`. Résultats mesurés :
+`docs/rag_quality_metrics.json`. Les PDF, registres locaux, poids et bases Chroma
+restent ignorés par Git. Les pages scannées exigent un OCR externe non implémenté.
+
 ## Organisation du code
 
 ```text
@@ -275,8 +365,17 @@ metropt_maintenance/
     workflow.py                 exécution et observations JSON pour agents
     report.py                   courbes des scores et rapport ML
     __main__.py                 commande de baseline complète
-  rag/, orchestration/,
+  rag/
+    documents.py                extraction PDF et provenance déclarée
+    chunking.py                 passages limités à une page et offsets
+    embeddings.py               Sentence Transformers local, révision fixée
+    index.py                    ChromaDB et remplacement de l'index actif
+    search.py                   search_documents et abstention
+    evaluation.py               qualité sur questions et pages annotées
+    __main__.py                 préparation, indexation, recherche, évaluation
+  orchestration/,
   maintenance/, storage/        dossiers réservés, aucune implémentation
+ documents/                     PDF locaux et exemple de registre de provenance
  data/raw/                      CSV locaux ignorés par Git
  data/local/                    rapports et futurs artefacts locaux
  docs/exploration_metropt3.md    résultats réels et limites de l'analyse
@@ -284,7 +383,8 @@ metropt_maintenance/
 ```
 
 `requirements.txt` contient maintenant Streamlit, Pytest, Pandas, NumPy, Plotly,
-Requests, Scikit-learn et Joblib. Les autres bibliothèques de la stack seront ajoutées lors de leur
+Requests, Scikit-learn, Joblib, PyMuPDF, Sentence Transformers et ChromaDB.
+Les autres bibliothèques de la stack seront ajoutées lors de leur
 utilisation. SQLite temporaire utilise `sqlite3` fourni avec Python. Les bornes
 de versions ne remplacent pas un verrouillage exact de l'environnement.
 

@@ -43,3 +43,7 @@ Thumbs.db
 .idea/
 .vscode/
 work/
+
+# Corpus PDF et provenance locale ; conserver la documentation et l'exemple.
+documents/**/*.[pP][dD][fF]
+documents/sources.json
