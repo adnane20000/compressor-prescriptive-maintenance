@@ -1,0 +1,45 @@
+# Python et environnements virtuels
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+
+# Tests et outils
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+
+# Secrets et configuration locale
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Données et artefacts locaux (conserver les dossiers vides)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/local/*
+!data/local/.gitkeep
+models/*
+!models/.gitkeep
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite*
+*.log
+
+# Système, éditeurs et travail temporaire
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+work/
