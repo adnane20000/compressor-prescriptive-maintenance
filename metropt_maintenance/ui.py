@@ -11,7 +11,7 @@ import streamlit as st
 from .ingestion.exploration import profile_csv
 from .ingestion.replay import iter_replay
 from .ingestion.report import aggregate_charts, build_figures, write_report
-from .ingestion.schema import CSV_NAME, PLOT_COLUMNS
+from .ingestion.schema import CSV_NAME, PLOT_COLUMNS, SIGNALS
 
 
 def _diagnostic_panel() -> None:
@@ -70,6 +70,113 @@ def _diagnostic_panel() -> None:
         st.json(result.model_dump(mode="json"))
 
 
+def _review_status(state: dict) -> str:
+    """Afficher la décision persistée ; une attente ou une erreur ne vaut jamais approbation."""
+    decision = state.get("decision")
+    if decision:
+        return {
+            "approved_documentary_proposal": "Proposition documentaire approuvée",
+            "rejected": "Proposition refusée",
+            "revision_requested": "Révision demandée — proposition non approuvée",
+            "information_requested": "Informations demandées — proposition non approuvée",
+            "closed_without_alert": "Clôturé sans alerte — aucune validation humaine",
+        }[decision["outcome"]]
+    if state.get("review"):
+        return "Décision humaine reçue — enregistrement en attente"
+    if state.get("proposal"):
+        return "En attente de validation humaine"
+    return "Clôture en attente d'enregistrement"
+
+
+def _render_review_card(state: dict) -> None:
+    """Présenter les preuves et leur statut, avec le texte documentaire rendu comme donnée."""
+    st.subheader("Fiche de supervision humaine")
+    st.text(f"Workflow : {state['run_id']}")
+    st.text(f"Statut de validation : {_review_status(state)}")
+    diagnostic = state.get("diagnostic") or {}
+    proposal = state.get("proposal") or {}
+    event = state.get("ml_event") or {}
+    if state.get("request", {}).get("data_context") == "synthetic_test":
+        st.info("Mesures SYNTHÉTIQUES déclarées pour ce dossier de test.")
+    if diagnostic.get("simulation"):
+        st.warning("SIMULATION MOCK — le diagnostic est simulé, sans appel à un LLM.")
+    st.caption("L'approbation porte sur la préparation documentaire. Aucun diagnostic confirmé, aucune autorisation ni commande d'intervention physique.")
+
+    st.markdown("#### Mesures et anomalies observées")
+    if event:
+        st.text(f"Minute analysée : {event.get('window_start') or 'non renseignée'} ; disponible à {event.get('available_at', 'non renseigné')} (horodatages historiques).")
+        if event.get("status") == "scored":
+            observed = "Anomalie statistique détectée" if event["is_anomaly"] else "Aucune anomalie statistique détectée sur cette fenêtre"
+            st.text(f"{observed} ; score {event['anomaly_score']:.6f} ; seuil {event['threshold']:.6f}.")
+        else:
+            st.text("Fenêtre non scorée : données ou historique insuffisants.")
+        if event.get("mode_interpreted"):
+            st.text(f"Mode interprété : {event['mode_interpreted']} ; mode mixte : {event.get('mode_mixed')}.")
+    else:
+        st.text("Résultat ML indisponible. Aucune normalité ne peut être conclue.")
+    st.caption("Le score d'anomalie n'est pas une probabilité de panne.")
+    units = {signal.name: signal.unit for signal in SIGNALS}
+    measurements = []
+    for name, value in state.get("measurements", {}).items():
+        measure = value if isinstance(value, dict) else {"value": value}
+        measurements.append({"Signal": name, "Valeur": measure.get("value"),
+                             "Unité": measure.get("unit", units.get(name)), "Agrégation": measure.get("aggregation", "non précisée")})
+    if measurements:
+        st.dataframe(pd.DataFrame(measurements), hide_index=True)
+    else:
+        st.text("Aucune mesure exploitable disponible.")
+
+    st.markdown("#### Hypothèses du diagnostic préliminaire")
+    hypotheses = diagnostic.get("hypotheses_de_defaillance", [])
+    for hypothesis in hypotheses:
+        st.text(f"{hypothesis['label']} — hypothèse non confirmée ; source {hypothesis['source_id']} ; applicabilité {hypothesis['equipment_relevance']}.")
+    if not hypotheses:
+        st.text("Aucune hypothèse documentée disponible. Une anomalie ne confirme aucune cause.")
+    if diagnostic:
+        st.text(f"Incertitude : {diagnostic['niveau_incertitude']}.")
+    if diagnostic.get("erreur"):
+        st.text(diagnostic["erreur"])
+
+    st.markdown("#### Sources documentaires")
+    sources = diagnostic.get("sources", [])
+    for source in sources:
+        st.text(f"{source['id']} — {source['file_name']}, p. {source['page']} (page physique) ; statut {source['authority']} ; portée {source['applicability']}.")
+        with st.expander(f"Passage {source['id']} et provenance"):
+            st.text(source["passage"])
+            st.text(f"SHA-256 : {source['pdf_sha256']} ; équipement : {source['equipment_reference'] or 'applicabilité spécifique non établie'}.")
+    if not sources:
+        st.text("Aucune source documentaire vérifiée disponible pour le diagnostic.")
+    for argument in diagnostic.get("arguments_documentaires", []):
+        st.text(f"Argument {argument['id']} — source {argument['source_id']} : {argument['excerpt']}")
+
+    st.markdown("#### Contrôles recommandés")
+    for action in proposal.get("actions", []):
+        st.text(action["description"])
+    if not proposal.get("actions"):
+        st.text("Aucun contrôle proposé.")
+    st.caption("Contrôles documentaires ou analyses de données uniquement ; aucune procédure de terrain générée.")
+
+    st.markdown("#### Informations manquantes")
+    missing = list(dict.fromkeys(proposal.get("missing_information", []) + [item["description"] for item in diagnostic.get("informations_manquantes", [])]))
+    for description in missing:
+        st.text(description)
+    if not missing:
+        st.text("Aucune information manquante consignée ; la suffisance du dossier reste à examiner.")
+    if proposal:
+        st.text(f"Référence de la proposition soumise : {proposal['proposal_id']}")
+        if not proposal["approval_allowed"]:
+            st.warning("Approbation bloquée : dossier insuffisant ou traitement en erreur. Un refus ou une demande de révision reste possible.")
+
+    decision = state.get("decision")
+    if decision and decision.get("review"):
+        receipt = decision["review"]
+        st.markdown("#### Décision enregistrée")
+        st.text(f"Identifiant du validateur : {decision.get('validator_id') or receipt['submission']['reviewer']}")
+        st.text(f"Horodatage de la revue (UTC) : {receipt['recorded_at_utc']}")
+        st.text(f"Enregistrement de la décision (UTC) : {decision['recorded_at_utc']}")
+        st.text(f"Commentaires : {receipt['submission']['comment']}")
+
+
 def _workflow_panel(csv_path: Path) -> None:
     """Démarrer un dossier borné et soumettre une revue explicite au checkpoint."""
     from .orchestration import open_workflow
@@ -84,6 +191,7 @@ def _workflow_panel(csv_path: Path) -> None:
     context = st.selectbox("Origine déclarée des mesures du workflow", ["Historique rejoué", "Synthétique (test)"])
     question = st.text_input("Question documentaire du workflow", value="Quels documents décrivent Oil_temperature, Motor_current, TP2 et TP3 ?")
     if st.button("Démarrer le workflow sur cette fenêtre"):
+        st.session_state.pop("workflow_active_id", None)
         try:
             with st.spinner("Analyse ML et parcours du graphe jusqu'à la clôture ou la revue…"):
                 request = load_measurement_window(csv_path, start, end, data_context="historical_replay" if context == "Historique rejoué" else "synthetic_test", question=question)
@@ -109,28 +217,35 @@ def _workflow_panel(csv_path: Path) -> None:
     try:
         with open_workflow(model_path=model_path) as runner:
             state = runner.get_state(run_id)
-            st.write(f"Dossier : {run_id}")
+            _render_review_card(state)
             if state["interrupts"]:
-                st.warning("En attente de revue humaine. La proposition ne contient aucune procédure physique et n'autorise aucune intervention.")
-                st.json(state["proposal"])
-                choices = {"Choisir une décision": None, "Refuser": "reject", "Demander des informations": "request_information"}
-                if state["proposal"]["approval_allowed"]:
-                    choices["Approuver la préparation documentaire"] = "approve"
-                choice = choices[st.selectbox("Décision humaine sur ce dossier", list(choices), key=f"workflow_choice_{run_id}")]
-                reviewer = st.text_input("Identité du relecteur", key=f"workflow_reviewer_{run_id}")
-                comment = st.text_area("Commentaire de la revue", key=f"workflow_comment_{run_id}")
-                acknowledged = st.checkbox("Je confirme cette revue documentaire ; aucune intervention physique n'est autorisée.", key=f"workflow_ack_{run_id}")
-                if st.button("Envoyer la revue humaine", disabled=not (choice and reviewer.strip() and comment.strip() and acknowledged)):
-                    state = runner.review(run_id, {"proposal_id": state["proposal"]["proposal_id"], "decision": choice,
+                st.markdown("#### Votre décision")
+                form_key = f"{run_id}_{state['proposal']['proposal_id']}"
+                reviewer = st.text_input("Identifiant du validateur", max_chars=200, key=f"workflow_reviewer_{form_key}")
+                comment = st.text_area("Commentaire de la revue", max_chars=2000, key=f"workflow_comment_{form_key}")
+                acknowledged = st.checkbox("Je confirme cette revue documentaire ; aucune intervention physique n'est autorisée.", key=f"workflow_ack_{form_key}")
+                ready = len(reviewer.strip()) >= 2 and bool(comment.strip()) and acknowledged
+                approve, reject, revise = st.columns(3)
+                choice = None
+                if approve.button("Approuver", disabled=not (ready and state["proposal"]["approval_allowed"])):
+                    choice = "approve"
+                if reject.button("Refuser", disabled=not ready):
+                    choice = "reject"
+                if revise.button("Demander une révision", disabled=not ready):
+                    choice = "request_revision"
+                if choice:
+                    runner.review(run_id, {"proposal_id": state["proposal"]["proposal_id"], "decision": choice,
                                                   "reviewer": reviewer, "comment": comment, "acknowledged": acknowledged})
+                    st.rerun()
                 if state["review_error"]:
                     st.error(state["review_error"])
             elif state["pending_nodes"] == ["finalize_node"]:
                 if st.button("Réessayer l'enregistrement de la décision"):
-                    state = runner.retry_finalization(run_id)
-            st.write(f"État du workflow : {state['phase']}")
-            st.dataframe(pd.DataFrame(state["journal"]), hide_index=True)
-            st.json({key: state[key] for key in ("ml_event", "monitoring_summary", "retrieval", "diagnostic", "proposal", "review", "decision", "errors")})
+                    runner.retry_finalization(run_id)
+                    st.rerun()
+            with st.expander("Journal du workflow et détails techniques"):
+                st.dataframe(pd.DataFrame(state["journal"]), hide_index=True)
+                st.json({key: state[key] for key in ("ml_event", "monitoring_summary", "retrieval", "diagnostic", "proposal", "review", "decision", "errors")})
     except (OSError, ValueError, KeyError, sqlite3.Error, WorkflowPersistenceError) as error:
         st.error(str(error))
 

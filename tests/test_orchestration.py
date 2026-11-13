@@ -96,6 +96,7 @@ def test_anomaly_pauses_with_intermediates_without_a_decision(workflow_request, 
     ("approve", "approved_documentary_proposal", True),
     ("reject", "rejected", False),
     ("request_information", "information_requested", False),
+    ("request_revision", "revision_requested", False),
 ])
 def test_only_explicit_reviews_finalize_and_never_trigger_equipment(workflow_request, workflow_services, tmp_path, decision, outcome, validated):
     services, calls, _ = workflow_services
@@ -106,6 +107,9 @@ def test_only_explicit_reviews_finalize_and_never_trigger_equipment(workflow_req
         assert state["decision"]["review"]["submission"]["reviewer"] == "Test SYNTHETIQUE"
         assert not state["decision"]["intervention_authorized"] and not state["decision"]["physical_action_triggered"]
         assert not state["decision"]["diagnosis_confirmed"]
+        assert state["decision"]["validator_id"] == "Test SYNTHETIQUE"
+        assert state["decision"]["comments"] == submission(initial)["comment"]
+        assert state["decision"]["reviewed_at_utc"] == state["review"]["recorded_at_utc"]
         assert state["phase"] == "finalized" and not state["pending_nodes"]
         assert calls["llm"] == 1
         assert [entry["sequence"] for entry in state["journal"]] == list(range(1, len(state["journal"]) + 1))
@@ -283,7 +287,7 @@ def test_decision_store_is_idempotent_and_refuses_inconsistent_decisions(tmp_pat
     record = DecisionRecord(run_id="synthetic", recorded_at_utc="2026-11-13T00:00:00+00:00", outcome="closed_without_alert",
                             human_validated=False, review=None, proposal_id=None, ml_event=None, simulation=None)
     saved = store.save(record)
-    assert store.save(record.model_copy(update={"recorded_at_utc": "later"})) == saved
+    assert store.save(record.model_copy(update={"recorded_at_utc": "2026-11-14T00:00:00+00:00"})) == saved
     with pytest.raises(ValueError, match="différente"):
         store.save(record.model_copy(update={"ml_event": {"model_id": "different"}}))
     with pytest.raises(ValueError): DecisionRecord.model_validate({**record.model_dump(), "human_validated": True})
@@ -316,7 +320,12 @@ def test_unexpected_diagnostic_error_is_sanitized(workflow_request, workflow_ser
     assert "untrusted-secret-not-to-publish" not in json.dumps(state)
 
 
-def test_streamlit_requires_manual_review_and_reopens_saved_thread(workflow_services, ml_measurements, tmp_path, monkeypatch):
+@pytest.mark.parametrize("action, outcome, status", [
+    ("Approuver", "approved_documentary_proposal", "Proposition documentaire approuvée"),
+    ("Refuser", "rejected", "Proposition refusée"),
+    ("Demander une révision", "revision_requested", "Révision demandée"),
+])
+def test_streamlit_requires_manual_review_and_reopens_saved_thread(workflow_services, ml_measurements, tmp_path, monkeypatch, action, outcome, status):
     from pathlib import Path
     from streamlit.testing.v1 import AppTest
     services, calls, _ = workflow_services
@@ -338,20 +347,114 @@ def test_streamlit_requires_manual_review_and_reopens_saved_thread(workflow_serv
     widget(app.button, "Démarrer le workflow sur cette fenêtre").click().run(timeout=20)
     assert not app.exception
     run_id = app.session_state["workflow_active_id"]
-    assert widget(app.button, "Envoyer la revue humaine").disabled
+    assert widget(app.button, "Approuver").disabled
+    assert widget(app.button, "Refuser").disabled
+    assert widget(app.button, "Demander une révision").disabled
+    assert any(item.value == "Fiche de supervision humaine" for item in app.subheader)
+    assert any("Statut de validation : En attente" in item.value for item in app.text)
+    assert any("description_test.pdf, p. 1" in item.value for item in app.text)
+    assert {"Signal", "Valeur", "Unité", "Agrégation"} <= set(next(table.value for table in app.dataframe if "Signal" in table.value))
     assert services.decisions.get(run_id) is None
     # Nouveau navigateur simulé : l'état est retrouvé dans SQLite, pas dans session_state.
     reopened = AppTest.from_file(app_path).run(timeout=15)
     widget(reopened.text_input, "Identifiant du dossier à rouvrir").set_value(run_id).run()
     widget(reopened.button, "Rouvrir le dossier enregistré").click().run()
     assert not reopened.exception and reopened.session_state["workflow_active_id"] == run_id
-    widget(reopened.selectbox, "Décision humaine sur ce dossier").select("Approuver la préparation documentaire").run()
-    widget(reopened.text_input, "Identité du relecteur").set_value("Relecteur SYNTHETIQUE").run()
+    widget(reopened.text_input, "Identifiant du validateur").set_value("validateur-test-01").run()
     widget(reopened.text_area, "Commentaire de la revue").set_value("Test simulé du parcours documentaire.").run()
-    assert widget(reopened.button, "Envoyer la revue humaine").disabled
+    assert widget(reopened.button, "Approuver").disabled
     widget(reopened.checkbox, "Je confirme cette revue documentaire ; aucune intervention physique n'est autorisée.").check().run()
-    widget(reopened.button, "Envoyer la revue humaine").click().run()
+    widget(reopened.button, action).click().run()
     assert not reopened.exception
-    assert services.decisions.get(run_id)["outcome"] == "approved_documentary_proposal"
+    assert services.decisions.get(run_id)["outcome"] == outcome
+    assert services.decisions.get(run_id)["human_validated"] is (action == "Approuver")
     assert not services.decisions.get(run_id)["intervention_authorized"]
+    assert services.decisions.get(run_id)["validator_id"] == "validateur-test-01"
+    assert any(f"Statut de validation : {status}" in item.value for item in reopened.text)
+    assert any("Identifiant du validateur : validateur-test-01" in item.value for item in reopened.text)
+    assert all(button.label != "Approuver" for button in reopened.button)
     assert calls["monitor"] == calls["llm"] == 1
+
+
+def test_a_forged_approval_in_a_checkpoint_is_not_exposed_as_valid(workflow_request, workflow_services, tmp_path):
+    services, _, _ = workflow_services
+    with open_workflow(directory=tmp_path / "checkpoint", services=services) as runner:
+        paused = runner.start(workflow_request)
+        forged = {"run_id": paused["run_id"], "recorded_at_utc": "2026-11-13T10:01:00+00:00",
+                  "outcome": "approved_documentary_proposal", "human_validated": True, "review": None,
+                  "proposal_id": paused["proposal"]["proposal_id"], "ml_event": paused["ml_event"], "simulation": True}
+        runner.graph.update_state(runner._config(paused["run_id"]), {"decision": forged})
+        with pytest.raises(ValueError):
+            runner.get_state(paused["run_id"])
+    assert services.decisions.get(paused["run_id"]) is None
+
+
+@pytest.mark.parametrize("case", ["no_receipt", "empty_receipt", "no_ack", "false_ack", "wrong_proposal", "wrong_decision", "wrong_validator", "wrong_comment", "wrong_time", "naive_time"])
+def test_storage_rejects_approval_without_a_matching_explicit_receipt(tmp_path, case):
+    """La persistance refuse aussi les approbations fabriquées hors du graphe."""
+    store = DecisionStore(tmp_path / "guarded.sqlite")
+    record = {"run_id": "synthetic", "recorded_at_utc": "2026-11-13T10:01:00+00:00",
+              "outcome": "approved_documentary_proposal", "human_validated": True,
+              "proposal_id": "a" * 64, "ml_event": None, "simulation": True,
+              "review": {"submission": {"proposal_id": "a" * 64, "decision": "approve", "reviewer": "test-01",
+                                        "comment": "Revue SYNTHETIQUE", "acknowledged": True},
+                         "recorded_at_utc": "2026-11-13T10:00:00+00:00"}}
+    if case == "no_receipt": record["review"] = None
+    if case == "empty_receipt": record["review"] = {}
+    if case == "no_ack": record["review"]["submission"].pop("acknowledged")
+    if case == "false_ack": record["review"]["submission"]["acknowledged"] = False
+    if case == "wrong_proposal": record["review"]["submission"]["proposal_id"] = "b" * 64
+    if case == "wrong_decision": record["review"]["submission"]["decision"] = "reject"
+    if case == "wrong_validator": record["validator_id"] = "different-validator"
+    if case == "wrong_comment": record["comments"] = "Commentaire substitué"
+    if case == "wrong_time": record["recorded_at_utc"] = "2026-11-13T09:00:00+00:00"
+    if case == "naive_time": record["review"]["recorded_at_utc"] = "2026-11-13T10:00:00"
+    with pytest.raises(ValueError):
+        # Même un appelant qui contourne le constructeur Pydantic ne peut écrire cette décision.
+        store.save(DecisionRecord.model_construct(**record))
+    assert not store.path.exists()
+
+
+def test_sqlite_columns_record_review_and_legacy_database_is_migrated(tmp_path):
+    path = tmp_path / "legacy.sqlite"
+    old = {"run_id": "synthetic-legacy", "recorded_at_utc": "2026-11-13T10:01:00+00:00",
+           "outcome": "revision_requested", "human_validated": False, "proposal_id": "a" * 64,
+           "ml_event": None, "simulation": True,
+           "review": {"submission": {"proposal_id": "a" * 64, "decision": "request_revision", "reviewer": "test-02",
+                                     "comment": "Documents à compléter — test synthétique", "acknowledged": True},
+                      "recorded_at_utc": "2026-11-13T10:00:00+00:00"}}
+    with sqlite3.connect(path) as connection:
+        connection.execute("CREATE TABLE workflow_decisions (run_id TEXT PRIMARY KEY, record_json TEXT NOT NULL)")
+        connection.execute("INSERT INTO workflow_decisions VALUES (?, ?)", (old["run_id"], json.dumps(old)))
+    store = DecisionStore(path)
+    saved = store.get(old["run_id"])
+    assert saved["validator_id"] == "test-02" and not saved["human_validated"]
+    with sqlite3.connect(path) as connection:
+        row = connection.execute("SELECT decision, decided_at_utc, validator_id, comments FROM workflow_decisions").fetchone()
+        assert row == ("revision_requested", old["recorded_at_utc"], "test-02", old["review"]["submission"]["comment"])
+        connection.execute("UPDATE workflow_decisions SET decision='approved_documentary_proposal'")
+    with pytest.raises(ValueError, match="incohérentes"):
+        store.get(old["run_id"])
+
+
+def test_revision_request_remains_unapproved_after_restart(workflow_request, workflow_services, tmp_path):
+    services, calls, _ = workflow_services
+    directory = tmp_path / "revision"
+    with open_workflow(directory=directory, services=services) as runner:
+        paused = runner.start(workflow_request)
+        requested = runner.review(paused["run_id"], submission(paused, "request_revision"))
+        assert requested["decision"]["outcome"] == "revision_requested"
+        assert not requested["decision"]["human_validated"] and not requested["decision"]["intervention_authorized"]
+    with open_workflow(directory=directory, services=services) as reopened:
+        restored = reopened.get_state(paused["run_id"])
+        assert restored["decision"] == requested["decision"]
+        with pytest.raises(ValueError, match="n'attend pas"):
+            reopened.review(paused["run_id"], submission(paused))
+    assert calls["monitor"] == calls["llm"] == 1
+
+
+@pytest.mark.parametrize("outcome", ["rejected", "revision_requested", "information_requested", "closed_without_alert"])
+def test_review_card_does_not_label_other_decisions_as_approved(outcome):
+    from metropt_maintenance.ui import _review_status
+    assert "approuvée" not in _review_status({"decision": {"outcome": outcome}}).replace("non approuvée", "")
+    assert "approuvée" not in _review_status({"decision": None, "review": {"submission": {"decision": "approve"}}})

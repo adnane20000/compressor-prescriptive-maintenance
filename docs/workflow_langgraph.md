@@ -22,7 +22,7 @@ flowchart TD
     H --> I{{interrupt : attente persistante}}
     I -->|reprise explicite avec une soumission| V{Soumission recevable ?}
     V -->|non| H
-    V -->|oui : approve, reject ou request_information| F
+    V -->|oui : approve, reject ou request_revision| F
     F --> E([Fin : décision enregistrée])
 ```
 
@@ -137,19 +137,23 @@ La soumission doit contenir exactement :
 | Champ | Exigence |
 | --- | --- |
 | `proposal_id` | Hash de la proposition affichée pour ce dossier |
-| `decision` | `approve`, `reject` ou `request_information` |
-| `reviewer` | Identité déclarée non vide |
+| `decision` | `approve`, `reject` ou `request_revision` ; ancien code `request_information` conservé pour compatibilité |
+| `reviewer` | Identifiant déclaré du validateur, non vide |
 | `comment` | Commentaire non vide |
 | `acknowledged` | Booléen `true` explicite, jamais implicite ou numérique |
 
-Quand le dossier est bloqué, seules `reject` et `request_information` sont
+Quand le dossier est bloqué, seules `reject`, `request_revision` et l'ancien `request_information` sont
 recevables. Une soumission invalide conserve l'attente et le même dossier,
-sans nouveau calcul ML, RAG ou LLM. Une demande d'informations clôt ce dossier
-avec ce statut ; un nouveau dossier doit être créé après apport des éléments.
+sans nouveau calcul ML, RAG ou LLM. Une demande de révision clôt ce dossier
+avec le statut `revision_requested`, sans approbation ; un nouveau dossier doit
+être créé après correction des données ou documents. L'ancien code de demande
+d'informations conserve son statut `information_requested`.
 L'application n'invente pas automatiquement une nouvelle proposition.
 
-Dans Streamlit, la décision commence sur « Choisir une décision », la case de
-confirmation est décochée et le bouton reste désactivé sans les champs requis.
+Dans Streamlit, la fiche expose les faits, hypothèses, sources/pages, contrôles,
+informations manquantes et statut réel. Les trois boutons sont « Approuver »,
+« Refuser » et « Demander une révision ». La case de confirmation est décochée
+et les boutons restent désactivés sans identifiant, commentaire et confirmation.
 L'identité est déclarative : ce prototype local n'intègre pas d'authentification
 ou de contrôle d'accès industriel. Les sources et modèles sont des instantanés
 du traitement ; le relecteur doit vérifier leur actualité et leur applicabilité.
@@ -161,6 +165,13 @@ dans `data/local/workflow/decisions.sqlite`, table `workflow_decisions`. Il n'y 
 qu'une décision par identifiant. Un enregistrement rejoué avec le même contenu
 renvoie la décision initiale ; un contenu différent est refusé. Les requêtes SQL
 utilisent des paramètres. Ce stockage est limité aux décisions de ce workflow.
+Les colonnes `decision`, `decided_at_utc`, `validator_id` et `comments` rendent
+l'audit accessible directement en SQL. Les anciennes tables à deux colonnes sont
+migrées transactionnellement ; les métadonnées sont déduites des reçus existants
+valides. Avant écriture, le stockage revalide le reçu, son identifiant de proposition,
+la décision, le validateur et les dates UTC. Une approbation sans reçu confirmé
+ou une substitution de métadonnées est refusée. Les décisions d'un checkpoint
+sont aussi revalidées à la lecture avant affichage du statut.
 
 Les deux écritures, décision puis checkpoint de fin, ne forment pas une transaction
 commune. Le test de reprise simule donc un arrêt après écriture de la décision
@@ -179,13 +190,15 @@ une deuxième fois via l'API de revue.
 
 ## Vérifications exécutées
 
-`python -m pytest` : **204 tests réussis**, dont **37 tests d'orchestration,
+`python -m pytest` : **224 tests réussis**, dont **57 tests d'orchestration,
 proposition et persistance**. Ils vérifient les branches normales et anormales,
 les sources absentes, refus à risque, erreurs ML/RAG/API et réponses invalides,
 la revue obligatoire, les soumissions invalides, la réouverture du checkpointer,
 la reprise idempotente après arrêt, l'absence de réentraînement, l'absence de
 secret dans l'état et le parcours Streamlit. Les approbations de tests sont
 exclusivement des simulations sur données et PDF synthétiques.
+Les vérifications supplémentaires de la fiche et de l'audit sont détaillées
+dans `docs/human_supervision.md`.
 
 `python -m pip check` : aucune incompatibilité détectée. Versions réellement
 utilisées : LangGraph **1.2.21**, checkpointer SQLite **3.1.3**, Pydantic **2.14.3**.

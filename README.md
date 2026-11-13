@@ -469,10 +469,18 @@ flowchart TD
 Une fenêtre normale est clôturée **sans RAG, sans LLM et sans validation humaine**.
 Une anomalie conduit à une proposition documentaire ; les erreurs ou sources
 absentes produisent un dossier bloqué dont l'approbation est refusée. Le relecteur
-peut demander des informations ou refuser le dossier. Quand il est recevable,
-il peut approuver sa préparation documentaire. Nom, commentaire, choix explicite
-et confirmation sont nécessaires ; aucun choix d'approbation n'est présélectionné.
+dispose de trois boutons : **Approuver**, **Refuser**, **Demander une révision**.
+L'approbation porte sur la préparation documentaire d'un dossier recevable.
+Identifiant du validateur, commentaire et confirmation explicite sont nécessaires ;
+les boutons sont désactivés tant que ces éléments ne sont pas renseignés.
 Toute décision reste sans autorisation ni déclenchement d'intervention physique.
+
+La **fiche de supervision humaine** présente les mesures et anomalies observées,
+les hypothèses non confirmées, les sources avec pages, les contrôles recommandés,
+les informations manquantes et le statut de validation. Les simulations sont
+signalées explicitement. Une révision demandée conserve la proposition non
+approuvée et les commentaires de correction ; après correction, lancer un
+nouveau dossier. Aucune proposition de remplacement n'est générée automatiquement.
 
 API Python, avec un intervalle historique réel et un modèle local déjà entraîné :
 
@@ -502,16 +510,22 @@ L'état typé conserve mesures, résultat ML, passages, diagnostic, proposition,
 revue, erreurs et journal. Le checkpointer SQLite est dans
 `data/local/workflow/checkpoints.sqlite` ; les décisions idempotentes sont dans
 `data/local/workflow/decisions.sqlite`. Les bases restent ignorées par Git. Le
-journal utilise des dates UTC explicites ; le fuseau des mesures MetroPT reste
+journal de décision possède les colonnes `decision`, `decided_at_utc`,
+`validator_id` et `comments`, en plus du dossier JSON complet. Les anciennes
+bases sont migrées lors de leur ouverture par le stockage. L'approbation est
+revérifiée avant écriture et à la lecture d'un checkpoint : une soumission
+valide et confirmée, liée à la bonne proposition, est obligatoire.
+Le journal utilise des dates UTC explicites ; le fuseau des mesures MetroPT reste
 non documenté. Aucun client ou secret LLM n'est stocké dans les checkpoints et
 le traçage distant LangSmith est désactivé dans l'API du workflow.
 
-**Validation exécutée : 204 tests réussis**, dont 37 tests du workflow et de sa
+**Validation exécutée : 224 tests réussis**, dont 57 tests du workflow et de sa
 persistance. Un essai distinct sur 45 mesures réelles a retrouvé l'anomalie de la
 minute close à 04:15 le 1er mars 2020, puis les passages DOE. Le diagnostic mock
 a été conservé et le checkpoint rouvert ; le dossier reste **en attente**, sans
 revue ni décision humaine émise. Rapport : `docs/workflow_integration_metrics.json`.
 Aucune API LLM réelle n'a été appelée pendant ces vérifications.
+La supervision et ses états sont décrits dans `docs/human_supervision.md`.
 
 ## Organisation du code
 
@@ -555,6 +569,7 @@ metropt_maintenance/
     nodes.py                    les sept nœuds et journal de chaque étape
     graph.py                    graphe, checkpointer et API start/review/retry
   maintenance/proposal.py       proposition documentaire, sans procédure physique
+  maintenance/review.py         contrat de revue explicite et reçu horodaté
   storage/decisions.py          décisions SQLite idempotentes
  documents/                     PDF locaux et exemple de registre de provenance
  data/raw/                      CSV locaux ignorés par Git

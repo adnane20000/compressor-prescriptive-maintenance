@@ -12,6 +12,7 @@ from pydantic import ValidationError
 
 from ..diagnostic.schemas import AnomalyEvent, DiagnosticResult
 from ..maintenance.proposal import prepare_proposal
+from ..maintenance.review import REVIEW_OUTCOMES
 from ..storage.decisions import DecisionRecord, DecisionStore
 from .state import HumanReview, WorkflowRequest, WorkflowState
 
@@ -112,7 +113,7 @@ class WorkflowNodes:
         submission = interrupt({"run_id": state["run_id"], "proposal": state["proposal"],
                                 "ml_event": state["ml_event"], "diagnostic": state["diagnostic"],
                                 "diagnostic_status": state["diagnostic"]["etat_generation"] if state["diagnostic"] else None,
-                                "allowed_decisions": ["approve", "reject", "request_information"] if state["proposal"]["approval_allowed"] else ["reject", "request_information"],
+                                "allowed_decisions": ["approve", "reject", "request_revision", "request_information"] if state["proposal"]["approval_allowed"] else ["reject", "request_revision", "request_information"],
                                 "previous_error": state["review_error"],
                                 "notice": "Revue documentaire uniquement. Aucune intervention autorisée ou déclenchée."})
         try:
@@ -136,7 +137,7 @@ class WorkflowNodes:
             review = HumanReview.model_validate(state["review"]["submission"])
             if review.proposal_id != state["proposal"]["proposal_id"] or (review.decision == "approve" and not state["proposal"]["approval_allowed"]):
                 raise ValueError("Revue non conforme à la proposition.")
-            outcome = {"approve": "approved_documentary_proposal", "reject": "rejected", "request_information": "information_requested"}[review.decision]
+            outcome = REVIEW_OUTCOMES[review.decision]
         record = DecisionRecord(run_id=state["run_id"], recorded_at_utc=utc_now(), outcome=outcome,
                                 human_validated=outcome == "approved_documentary_proposal", review=None if normal else state["review"],
                                 proposal_id=None if normal else state["proposal"]["proposal_id"], ml_event=state["ml_event"],

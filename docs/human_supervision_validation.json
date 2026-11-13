@@ -1,0 +1,29 @@
+{
+  "synthetic_test_only": true,
+  "browser": "Chromium + Playwright",
+  "card_sections_verified": [
+    "Mesures et anomalies observées",
+    "Hypothèses du diagnostic préliminaire",
+    "Sources documentaires",
+    "Contrôles recommandés",
+    "Informations manquantes"
+  ],
+  "initial_actions_disabled": true,
+  "explicit_confirmation_required": true,
+  "revision_requested": true,
+  "reopened_in_new_session": true,
+  "page_errors": [],
+  "sqlite_columns_verified": [
+    "decision",
+    "decided_at_utc",
+    "validator_id",
+    "comments"
+  ],
+  "recorded_outcome": "revision_requested",
+  "human_validated": false,
+  "intervention_authorized": false,
+  "real_llm_api_called": false,
+  "pytest_command": "python -m pytest",
+  "pytest_passed": 224,
+  "limits": "Contrats et parcours testés sur données et PDF synthétiques ; aucune authentification industrielle ni garantie de sécurité physique."
+}

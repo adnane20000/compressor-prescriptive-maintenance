@@ -4,10 +4,11 @@ import math
 from datetime import datetime
 from typing import Literal, TypedDict
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, model_validator
 
 from ..diagnostic.schemas import StrictModel
 from ..ingestion.schema import REQUIRED_COLUMNS
+from ..maintenance.review import HumanReview  # Ancien chemin public conservé.
 
 MAX_SAMPLES = 6000
 
@@ -31,29 +32,6 @@ class WorkflowRequest(StrictModel):
                     if type(value) not in (int, float) or not math.isfinite(value):
                         raise ValueError("Les mesures doivent être numériques finies ou absentes (null).")
         return self
-
-
-class HumanReview(StrictModel):
-    """Soumission explicite liée à la proposition affichée, jamais fabriquée par le LLM."""
-    proposal_id: str = Field(pattern=r"^[a-f0-9]{64}$")
-    decision: Literal["approve", "reject", "request_information"]
-    reviewer: str = Field(min_length=2, max_length=200)
-    comment: str = Field(min_length=1, max_length=2000)
-    acknowledged: Literal[True]
-
-    @field_validator("reviewer", "comment")
-    @classmethod
-    def nonblank(cls, value):
-        if not value.strip():
-            raise ValueError("Identité et commentaire doivent être renseignés.")
-        return value.strip()
-
-    @field_validator("acknowledged", mode="before")
-    @classmethod
-    def explicit_acknowledgment(cls, value):
-        if value is not True:
-            raise ValueError("Une reconnaissance explicite est requise.")
-        return value
 
 
 class JournalEntry(TypedDict):

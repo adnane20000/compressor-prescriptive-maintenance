@@ -15,7 +15,7 @@ from langsmith import tracing_context
 
 from ..diagnostic import generate_diagnostic
 from ..rag import search_documents
-from ..storage.decisions import DecisionStore
+from ..storage.decisions import DecisionRecord, DecisionStore
 from .monitoring import monitor_measurements
 from .nodes import WorkflowNodes, WorkflowServices
 from .state import WorkflowRequest, WorkflowState
@@ -67,7 +67,14 @@ class WorkflowRunner:
         snapshot = self.graph.get_state(self._config(run_id))
         if not snapshot.values:
             raise KeyError("Dossier introuvable dans les checkpoints locaux.")
-        return {**snapshot.values, "pending_nodes": list(snapshot.next),
+        values = dict(snapshot.values)
+        if values.get("decision") is not None:
+            decision = DecisionRecord.model_validate(values["decision"])
+            proposal = values.get("proposal")
+            if decision.run_id != run_id or (proposal and decision.proposal_id != proposal["proposal_id"]):
+                raise ValueError("Décision incohérente avec le dossier ou la proposition enregistrée.")
+            values["decision"] = decision.model_dump(mode="json")
+        return {**values, "pending_nodes": list(snapshot.next),
                 "interrupts": [{"id": item.id, "value": item.value} for item in snapshot.interrupts]}
 
     def review(self, run_id: str, submission: dict) -> dict:
