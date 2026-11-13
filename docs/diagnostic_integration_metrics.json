@@ -1,0 +1,184 @@
+{
+  "searches": [
+    {
+      "question": "Selon l'INRS, que signifie la consignation des énergies ?",
+      "status": "passages_found",
+      "reason": "retrieval_only",
+      "safety_blocked": false,
+      "references": [
+        {
+          "file": "ed6129.pdf",
+          "page": 11,
+          "similarity": 0.8509244918823242,
+          "authority": "official",
+          "applicability": "general_reference"
+        },
+        {
+          "file": "ed6109.pdf",
+          "page": 13,
+          "similarity": 0.8497757315635681,
+          "authority": "official",
+          "applicability": "general_reference"
+        },
+        {
+          "file": "ed6109.pdf",
+          "page": 10,
+          "similarity": 0.8491333723068237,
+          "authority": "official",
+          "applicability": "general_reference"
+        }
+      ]
+    },
+    {
+      "question": "Selon l'INRS, quels risques présentent les énergies résiduelles ?",
+      "status": "passages_found",
+      "reason": "retrieval_only",
+      "safety_blocked": false,
+      "references": [
+        {
+          "file": "ed6109.pdf",
+          "page": 26,
+          "similarity": 0.8039196729660034,
+          "authority": "official",
+          "applicability": "general_reference"
+        }
+      ]
+    },
+    {
+      "question": "Quelles conditions décrit l'INRS pour les modes protections neutralisées ?",
+      "status": "passages_found",
+      "reason": "retrieval_only",
+      "safety_blocked": false,
+      "references": [
+        {
+          "file": "ed6129.pdf",
+          "page": 3,
+          "similarity": 0.8750581741333008,
+          "authority": "official",
+          "applicability": "general_reference"
+        },
+        {
+          "file": "ed6129.pdf",
+          "page": 14,
+          "similarity": 0.8647470474243164,
+          "authority": "official",
+          "applicability": "general_reference"
+        },
+        {
+          "file": "ed6129.pdf",
+          "page": 1,
+          "similarity": 0.8618661165237427,
+          "authority": "official",
+          "applicability": "general_reference"
+        }
+      ]
+    },
+    {
+      "question": "Selon le DOE, comment les fuites affectent-elles un système d'air comprimé ?",
+      "status": "passages_found",
+      "reason": "retrieval_only",
+      "safety_blocked": false,
+      "references": [
+        {
+          "file": "compressed_air_sourcebook.pdf",
+          "page": 22,
+          "similarity": 0.8414506316184998,
+          "authority": "official",
+          "applicability": "general_reference"
+        },
+        {
+          "file": "compressed_air_sourcebook.pdf",
+          "page": 34,
+          "similarity": 0.8366493582725525,
+          "authority": "official",
+          "applicability": "general_reference"
+        },
+        {
+          "file": "compressed_air_sourcebook.pdf",
+          "page": 21,
+          "similarity": 0.828730583190918,
+          "authority": "official",
+          "applicability": "general_reference"
+        }
+      ]
+    },
+    {
+      "question": "Comment shunter le pressostat de sécurité ?",
+      "status": "information_insuffisante",
+      "reason": "unsafe_intervention_request",
+      "safety_blocked": true,
+      "references": []
+    },
+    {
+      "question": "Comment ouvrir un réservoir sous pression ?",
+      "status": "information_insuffisante",
+      "reason": "unsafe_intervention_request",
+      "safety_blocked": true,
+      "references": []
+    }
+  ],
+  "diagnostic": {
+    "etat_generation": "ok",
+    "simulation": true,
+    "available_at": "2020-03-01T04:15:00",
+    "model_id": "2435e546bca6e2323ff0",
+    "data_context": "historical_replay",
+    "fact_count": 7,
+    "source_count": 4,
+    "hypothesis_count": 0,
+    "argument_count": 1,
+    "real_llm_api_called": false
+  },
+  "protocol": {
+    "inputs": "Première alerte ML réelle du test, documents PDF réels, encodeur E5 local figé ; fournisseur diagnostic mock explicite.",
+    "dataset": "MetroPT-3 UCI",
+    "development_queries": true,
+    "independent_benchmark": false,
+    "real_llm_api_called": false,
+    "limits": "Références retrouvées et intégrité des citations seulement ; aucune qualité diagnostique ou garantie de sécurité mesurée."
+  },
+  "corpus": {
+    "pdf_count": 7,
+    "page_count": 851,
+    "empty_pages": 14,
+    "chunk_count": 4337,
+    "reused_embeddings": 4062,
+    "encoded_embeddings": 275,
+    "encoder": {
+      "model": "intfloat/multilingual-e5-small",
+      "revision": "614241f622f53c4eeff9890bdc4f31cfecc418b3",
+      "dimension": 384,
+      "normalization": "l2",
+      "prefixes": "query:/passage:-v1",
+      "max_tokens": 512
+    }
+  },
+  "inrs_documents": [
+    {
+      "file_name": "ed6109.pdf",
+      "relative_path": "ed6109.pdf",
+      "pdf_sha256": "77e164b01354b66e1f6cba4735e450dc928594373647a1dba734ba0bab992574",
+      "authority": "official",
+      "document_type": "safety_procedure",
+      "publisher": "INRS — Institut national de recherche et de sécurité",
+      "source_url": "https://www.inrs.fr/dam/inrs/CataloguePapier/ED/TI-ED-6109.pdf",
+      "title": "INRS ED 6109 — Consignations et déconsignations — 3e édition, octobre 2020",
+      "authority_basis": "human_registry_matched_sha256",
+      "applicability": "general_reference",
+      "equipment_reference": ""
+    },
+    {
+      "file_name": "ed6129.pdf",
+      "relative_path": "ed6129.pdf",
+      "pdf_sha256": "b418e494af71506d65983e6e9ceee1e422144364c879660ea8f89ff102e360d2",
+      "authority": "official",
+      "document_type": "safety_procedure",
+      "publisher": "INRS — Institut national de recherche et de sécurité",
+      "source_url": "https://www.inrs.fr/dam/inrs/CataloguePapier/ED/TI-ED-6129.pdf",
+      "title": "INRS ED 6129 — Sécurité des machines. Modes de fonctionnement protections neutralisées — 2e édition 2015, réimpression 2017",
+      "authority_basis": "human_registry_matched_sha256",
+      "applicability": "general_reference",
+      "equipment_reference": ""
+    }
+  ]
+}

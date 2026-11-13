@@ -11,6 +11,7 @@ import numpy as np
 from .documents import AUTHORITIES, OPERATIONAL_TYPES, pdf_inventory
 from .embeddings import default_encoder
 from .index import INDEX_VERSION, chroma_client, read_manifest, registry_hash
+from .safety import SAFETY_NOTICE, assess_safety_request
 
 STOPWORDS = set("a au aux avec ce ces cet cette comme comment dans de des du en est et etre font for from how il ils is la le les leur leurs lui ne nous on ou par pas pour que quel quelle quelles quels qui se selon sont sur the to un une units what when where which pourquoi pouvez donner donne veuillez please does do are can could would expliquer explique signifie definition document documents pdf page pages".split())
 STOPWORDS.update("in of by at an it its as about into with be been being this that these those their them our your we you they than then through".split())
@@ -23,11 +24,13 @@ SYNONYMS.update({"secher": "dry", "sechage": "dry", "drying": "dry", "dryer": "d
                  "condensats": "condensate", "condensates": "condensate", "fuites": "leak", "leaks": "leak"})
 TOPIC_STOPWORDS = set("guide manuel manual sourcebook air compressed comprime compressor compresseurs system systeme nasa doe atlas copco kaeser according".split())
 SOURCE_ALIASES = {"nasa": ("nasa", "aeronautics"), "doe": ("department of energy",),
-                  "kaeser": ("kaeser",), "atlas": ("atlas copco",), "copco": ("atlas copco",)}
+                  "kaeser": ("kaeser",), "atlas": ("atlas copco",), "copco": ("atlas copco",), "inrs": ("inrs",)}
+TOPIC_STOPWORDS.add("inrs")
 OPERATIONAL_TERMS = set("procedure procedures securite safety urgence emergency consignation lockout serrage torque couple demonter demontage reparer reparation repair replacement replace disassemble disconnect debrancher isolate consigner intervention intervenir remplacement remplacer constructeur manufacturer maximale maximal maximum limite autorisee admissible".split())
 CRITICAL_GROUPS = (
     {"serrage", "torque"}, {"consignation", "lockout"}, {"urgence", "emergency"},
     {"maximale", "maximal", "maximum", "limite", "admissible", "autorisee"},
+    {"residuel", "residuels", "residuelle", "residuelles", "residual", "residuals"},
 )
 
 
@@ -71,6 +74,8 @@ class SearchResult:
     generated_answer: None = None
     similarity_is_probability: bool = False
     sufficiency_verified: bool = False
+    safety_blocked: bool = False
+    intervention_authorized: bool = False
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -96,6 +101,11 @@ def search_documents(
         raise ValueError("La question doit contenir entre 1 et 4 000 caractères.")
     if authority not in (*AUTHORITIES, "all") or not 1 <= top_k <= 20 or not -1 <= min_similarity <= 1:
         raise ValueError("Filtre, top_k ou seuil de similarité invalide.")
+    safety = assess_safety_request(question)
+    if safety.blocked:
+        result = insufficient(question, "unsafe_intervention_request", warnings=[SAFETY_NOTICE, *safety.reasons])
+        result.safety_blocked = True
+        return result
     manifest = read_manifest(index_directory)
     if manifest is None:
         return insufficient(question, "index_missing")

@@ -41,6 +41,7 @@ def registry_hash(directory: str | Path) -> str:
 def index_documents(
     documents_directory: str | Path = "documents", *, index_directory: str | Path = "data/local/rag",
     encoder=None, chunk_chars: int = 900, overlap_chars: int = 150, batch_size: int = 32,
+    reuse_embeddings: bool = True,
 ) -> dict:
     """Indexer en lots ; conserver l'ancien index actif si le nouvel encodage échoue."""
     if batch_size < 1:
@@ -56,6 +57,9 @@ def index_documents(
     registry = load_registry(documents_directory)
     client = chroma_client(index_directory)
     previous = read_manifest(index_directory)
+    reusable = (previous is not None and reuse_embeddings and previous["encoder"] == encoder.signature and
+                previous["chunking"] == {"version": CHUNK_VERSION, "chunk_chars": chunk_chars, "overlap_chars": overlap_chars})
+    old_collection = client.get_collection(previous["collection"], embedding_function=None) if reusable else None
     name = "metropt_" + uuid.uuid4().hex
     collection = client.create_collection(name, embedding_function=None,
                                           metadata={"index_version": INDEX_VERSION,
@@ -63,12 +67,26 @@ def index_documents(
                                           configuration={"hnsw": {"space": "cosine", "num_threads": 2}})
     warnings, documents, batch = [], [], []
     pages = empty_pages = count = 0
+    reused = encoded = 0
 
     def flush():
-        nonlocal count
+        nonlocal count, reused, encoded
         if not batch:
             return
-        vectors = np.asarray(encoder.encode_documents([chunk.text for chunk in batch]), dtype="float32")
+        cached = {}
+        if old_collection is not None:
+            existing = old_collection.get(ids=[chunk.identifier for chunk in batch], include=["embeddings"])
+            if existing["embeddings"] is not None:
+                cached = dict(zip(existing["ids"], existing["embeddings"]))
+        missing = [chunk for chunk in batch if chunk.identifier not in cached]
+        if missing:
+            new_vectors = np.asarray(encoder.encode_documents([chunk.text for chunk in missing]), dtype="float32")
+            if new_vectors.shape != (len(missing), encoder.signature["dimension"]):
+                raise ValueError("Dimensions des nouveaux embeddings invalides.")
+            cached.update(zip((chunk.identifier for chunk in missing), new_vectors))
+        vectors = np.asarray([cached[chunk.identifier] for chunk in batch], dtype="float32")
+        reused += len(batch) - len(missing)
+        encoded += len(missing)
         if vectors.shape != (len(batch), encoder.signature["dimension"]) or not np.isfinite(vectors).all() or (np.linalg.norm(vectors, axis=1) == 0).any():
             raise ValueError("Embeddings invalides : dimensions, valeurs non finies ou vecteur nul.")
         vectors = vectors / np.linalg.norm(vectors, axis=1, keepdims=True)
@@ -104,7 +122,8 @@ def index_documents(
                     "registry_sha256": original_registry_hash, "encoder": encoder.signature,
                     "chunking": {"version": CHUNK_VERSION, "chunk_chars": chunk_chars, "overlap_chars": overlap_chars},
                     "pdf_count": len(inventory), "page_count": pages, "empty_pages": empty_pages,
-                    "chunk_count": count, "documents": documents, "warnings": warnings,
+                    "chunk_count": count, "reused_embeddings": reused, "encoded_embeddings": encoded,
+                    "documents": documents, "warnings": warnings,
                     "created_at_utc": datetime.now(timezone.utc).isoformat()}
         index_directory.mkdir(parents=True, exist_ok=True)
         temporary = index_directory / "index.json.tmp"

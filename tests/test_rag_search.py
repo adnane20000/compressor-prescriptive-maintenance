@@ -62,6 +62,37 @@ def test_source_filters_do_not_invent_missing_publisher(rag_index):
     assert result.reason == "requested_source_missing" and not result.passages
 
 
+def test_residual_energy_query_does_not_return_generic_risk_frontmatter(tmp_path, rag_encoder):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    with pymupdf.open() as pdf:
+        pdf.new_page().insert_text((40, 50), "Les risques professionnels sont etudies pour la prevention.")
+        pdf.new_page().insert_text((40, 50), "Les energies residuelles necessitent une analyse des risques.")
+        pdf.save(docs / "synthetic-prevention.pdf")
+    index = tmp_path / "index"
+    index_documents(docs, index_directory=index, encoder=rag_encoder)
+    result = search_documents("Quels risques presentent les energies residuelles ?", index_directory=index, encoder=rag_encoder)
+    assert result.status == "passages_found" and [hit.page for hit in result.passages] == [2]
+
+
+def test_reindex_encodes_only_new_document_chunks(rag_index):
+    directory, index, encoder = rag_index
+    initial = read_manifest(index)
+    with pymupdf.open() as pdf:
+        pdf.new_page().insert_text((40, 50), "NOUVEAU DOCUMENT SYNTHETIQUE : prevention et energies residuelles.")
+        pdf.save(directory / "new-synthetic.pdf")
+    encoded_texts = []
+    class CountingEncoder:
+        signature = encoder.signature
+        def encode_documents(self, texts):
+            encoded_texts.extend(texts)
+            return encoder.encode_documents(texts)
+    updated = index_documents(directory, index_directory=index, encoder=CountingEncoder())
+    assert updated["reused_embeddings"] == initial["chunk_count"]
+    assert updated["encoded_embeddings"] == 1 and len(encoded_texts) == 1
+    assert "NOUVEAU DOCUMENT SYNTHETIQUE" in encoded_texts[0]
+
+
 def test_navigation_and_generic_english_words_are_not_evidence(tmp_path, rag_encoder):
     docs = tmp_path / "docs"
     docs.mkdir()
@@ -123,12 +154,13 @@ def test_reindex_is_idempotent_and_failed_encoding_preserves_old_index(rag_index
     reindexed = index_documents(directory, index_directory=index, encoder=encoder)
     assert initial["chunk_count"] == reindexed["chunk_count"]
     assert initial["collection"] != reindexed["collection"]
+    assert reindexed["reused_embeddings"] == initial["chunk_count"] and reindexed["encoded_embeddings"] == 0
     class Broken:
         signature = encoder.signature
         def encode_documents(self, texts):
             raise RuntimeError("synthetic encoding failure")
     with pytest.raises(RuntimeError):
-        index_documents(directory, index_directory=index, encoder=Broken())
+        index_documents(directory, index_directory=index, encoder=Broken(), reuse_embeddings=False)
     assert read_manifest(index)["collection"] == reindexed["collection"]
     assert search_documents("AMDEC", index_directory=index, encoder=encoder).passages
 

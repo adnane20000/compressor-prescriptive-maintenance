@@ -1,6 +1,8 @@
 """Exploration locale et rejeu pas à pas de mesures historiques."""
 
 from pathlib import Path
+import json
+import os
 
 import pandas as pd
 import streamlit as st
@@ -9,6 +11,62 @@ from .ingestion.exploration import profile_csv
 from .ingestion.replay import iter_replay
 from .ingestion.report import aggregate_charts, build_figures, write_report
 from .ingestion.schema import CSV_NAME, PLOT_COLUMNS
+
+
+def _diagnostic_panel() -> None:
+    """Relier explicitement une alerte ML aux passages courants du RAG."""
+    from .diagnostic import generate_diagnostic
+
+    st.subheader("Diagnostic préliminaire — ML et documents")
+    provider_name = os.getenv("LLM_PROVIDER", "mock")
+    st.caption(
+        "Le modèle ne commande aucun équipement. Les contrôles restent documentaires "
+        "ou analytiques et nécessitent une validation humaine. "
+        "En mode API, les mesures et les extraits sélectionnés sont envoyés au fournisseur configuré."
+    )
+    st.write(f"Fournisseur configuré : {provider_name}")
+    if provider_name == "mock":
+        st.info("SIMULATION MOCK — aucun appel à un service LLM.")
+    if st.button("Utiliser la première alerte ML disponible"):
+        path = Path("data/local/ml_baseline/agent_alerts.jsonl")
+        try:
+            with path.open(encoding="utf-8") as source:
+                line = next(source, "")
+            if not line:
+                raise ValueError("Aucune alerte ML disponible dans ce fichier.")
+            event = json.loads(line)
+            st.session_state.diagnostic_event_json = json.dumps(event, ensure_ascii=False, indent=2)
+            st.session_state.diagnostic_measures_json = json.dumps(event.get("observed_signals", {}), ensure_ascii=False, indent=2)
+            st.session_state.pop("diagnostic_result", None)
+        except (OSError, ValueError) as error:
+            st.error(str(error))
+    event_json = st.text_area("Événement d'anomalie ML (JSON)", value="", key="diagnostic_event_json", height=180)
+    measures_json = st.text_area("Mesures disponibles (JSON)", value="{}", key="diagnostic_measures_json", height=160)
+    rag_result = st.session_state.get("rag_result")
+    passages = rag_result.passages if rag_result is not None else []
+    diagnostic_identity = (event_json, measures_json, repr(passages),
+                           st.session_state.get("diagnostic_documents_root"), provider_name,
+                           os.getenv("LLM_MODEL"), os.getenv("LLM_BASE_URL"))
+    if st.session_state.get("diagnostic_identity") != diagnostic_identity:
+        st.session_state.pop("diagnostic_result", None)
+    st.caption(f"{len(passages)} passage(s) de la dernière recherche RAG utilisables ; chaque citation sera revérifiée dans le PDF.")
+    if st.button("Générer le diagnostic préliminaire"):
+        try:
+            with st.spinner("Validation des données, des sources et du diagnostic…"):
+                result = generate_diagnostic(json.loads(event_json), json.loads(measures_json), passages,
+                                             documents_directory=st.session_state.get("diagnostic_documents_root", "documents"))
+            st.session_state.diagnostic_result = result
+            st.session_state.diagnostic_identity = diagnostic_identity
+        except (OSError, ValueError) as error:
+            st.session_state.pop("diagnostic_result", None)
+            st.error(str(error))
+    result = st.session_state.get("diagnostic_result")
+    if result is not None:
+        if result.simulation:
+            st.warning("SIMULATION MOCK — ce résultat ne constitue pas un diagnostic causal issu d'un LLM.")
+        st.write(f"Statut : {result.statut} — {result.etat_generation} ; incertitude {result.niveau_incertitude}.")
+        st.caption("Ce résultat n'autorise aucune intervention. Aucun contrôle physique n'est déclenché.")
+        st.json(result.model_dump(mode="json"))
 
 
 def _rag_panel() -> None:
@@ -36,6 +94,7 @@ def _rag_panel() -> None:
                 key: manifest[key] for key in ("pdf_count", "page_count", "empty_pages", "chunk_count", "warnings", "documents")
             }
             st.session_state.rag_identity = identity
+            st.session_state.diagnostic_documents_root = documents_path
             st.session_state.pop("rag_result", None)
         except (OSError, ValueError, RuntimeError) as error:
             st.error(str(error))
@@ -55,6 +114,7 @@ def _rag_panel() -> None:
                 result = search_documents(question, index_directory=index_path, authority=authority)
             st.session_state.rag_result = result
             st.session_state.rag_identity = identity
+            st.session_state.diagnostic_documents_root = documents_path
         except (OSError, ValueError, RuntimeError) as error:
             st.session_state.pop("rag_result", None)
             st.error(str(error))
@@ -68,6 +128,7 @@ def _rag_panel() -> None:
             "corpus_changed_reindex_required": "Les PDF ou leur provenance ont changé : réindexer les documents.",
             "question_without_searchable_terms": "Préciser la question avec le sujet recherché.",
             "requested_source_missing": "L'éditeur demandé n'est pas présent dans le corpus déclaré.",
+            "unsafe_intervention_request": "Le prototype refuse de fournir un mode opératoire pour cette demande à risque.",
             "operational_source_missing": "Aucune source technique officielle adaptée à cette demande opérationnelle.",
             "equipment_specific_source_missing": "Aucune source liée au compresseur MetroPT-3 pour cette demande ; les ouvrages généraux ne suffisent pas.",
             "no_relevant_passage": "Aucun passage ne satisfait les critères de recherche.",
@@ -191,7 +252,10 @@ def main() -> None:
     st.title("MetroPT — Maintenance prescriptive")
     st.caption("Prototype académique • Compresseur industriel • MetroPT-3")
 
-    st.info("Mode démonstration — aucune clé API nécessaire. Les mesures chargées sont historiques.")
+    if os.getenv("LLM_PROVIDER", "mock") == "mock":
+        st.info("Mode démonstration — aucune clé API nécessaire. Les mesures chargées sont historiques.")
+    else:
+        st.info("Fournisseur LLM externe configuré pour le diagnostic. Les mesures chargées sont historiques.")
     st.warning(
         "Une anomalie ne constitue pas un diagnostic confirmé. "
         "Tout futur plan de maintenance nécessitera une validation humaine. "
@@ -235,4 +299,5 @@ def main() -> None:
         st.download_button("Télécharger le rapport HTML", Path(report_path).read_bytes(), file_name="metropt3_exploration.html", mime="text/html")
     _ml_panel(path, identity)
     _rag_panel()
+    _diagnostic_panel()
     _replay_panel(path, identity)

@@ -1,9 +1,10 @@
-# MetroPT — anomalies ML et recherche documentaire
+# MetroPT — anomalies ML, recherche documentaire et diagnostic préliminaire
 
 Prototype académique de maintenance prescriptive du compresseur MetroPT-3.
 Le projet implémente l'acquisition CSV, l'exploration, les rapports avec graphiques,
-le rejeu chronologique, une baseline ML Isolation Forest et la recherche documentaire
-RAG sans clé API. Le LLM,
+le rejeu chronologique, une baseline ML Isolation Forest, la recherche documentaire
+RAG et un diagnostic préliminaire structuré avec fournisseur LLM configurable.
+Le mode mock fonctionne sans clé API et s'affiche comme une simulation.
 LangGraph et les propositions de maintenance restent à implémenter.
 
 ## Installer et lancer
@@ -309,6 +310,8 @@ caractères avec chevauchement ne mélangent jamais deux pages. ChromaDB persist
 localement dans `data/local/rag/`. L'index actif est remplacé après succès ; un
 échec d'encodage conserve l'ancien index. Réindexer après modification du corpus
 ou du registre : le moteur refuse de retourner les anciennes références.
+Les vecteurs des chunks inchangés sont réutilisés si le modèle et le découpage
+correspondent ; les métadonnées de provenance sont relues et mises à jour.
 
 Un document n'est pas officiel parce que son texte l'affirme. Le statut vient
 d'un registre humain lié à son empreinte ; sans déclaration valide, il reste
@@ -325,13 +328,24 @@ retrouvés, pas réponse complète certifiée ; `generated_answer` reste nul et
 Les instructions, liens et scripts des PDF ne sont jamais exécutés.
 
 **Corpus local étendu :** description UCI, guide NASA RCM, sourcebook DOE,
-guide KAESER en français et Compressed Air Manual Atlas Copco, 9e édition.
-Les quatre nouveaux ouvrages sont des références générales ; aucune notice
+guide KAESER en français, Compressed Air Manual Atlas Copco, 9e édition, et
+guides INRS ED 6109 et ED 6129. Il contient **7 PDF, 851 pages physiques et
+4 337 chunks** après l'import INRS ; 14 pages sont sans texte exploitable.
+Ces ouvrages sont des références générales ; aucune notice
 spécifique au compresseur MetroPT-3 n'a été identifiée. Le fichier KAESER reste
 non vérifié faute de copie officielle exacte confirmée. Pour Atlas Copco, une
 copie de la même édition a été obtenue sur le site de l'éditeur, la pièce jointe
 dépassant la limite de transfert ; son identité binaire avec l'original n'est
 pas vérifiable. Les détails figurent dans `docs/rag_corpus_import.md`.
+Les deux fichiers INRS fournis correspondent exactement aux copies officielles
+vérifiées par SHA-256. Voir `docs/inrs_safety_import.md` pour leur provenance,
+leur portée et les limites des garde-fous logiciels.
+
+La recherche refuse certaines demandes explicites de contournement de protections
+ou d'intervention avec énergie présente, avant de charger l'index. Les questions
+de prévention restent recherchables. Ce filtre lexical ne garantit pas la
+sécurité d'une intervention. ED 6129 étudie des modes encadrés avec protections
+neutralisées ; le refus du prototype ne prétend pas les interdire universellement.
 
 La provenance est distincte de l'applicabilité : `general_reference` ne signifie
 pas procédure validée pour MetroPT-3. Une demande opérationnelle explicitement
@@ -351,6 +365,71 @@ python -m metropt_maintenance.rag evaluate tests/fixtures/rag_reference_question
 Protocole et limites : `docs/rag_retrieval.md`. Résultats mesurés :
 `docs/rag_quality_metrics.json`. Les PDF, registres locaux, poids et bases Chroma
 restent ignorés par Git. Les pages scannées exigent un OCR externe non implémenté.
+
+## Diagnostic préliminaire : ML + RAG + LLM
+
+Par défaut, aucun service LLM n'est appelé :
+
+```bash
+export LLM_PROVIDER=mock
+python -m streamlit run app.py --browser.gatherUsageStats=false
+```
+
+Dans le dashboard, effectuer une recherche documentaire, charger la première
+alerte ML disponible ou saisir un événement JSON, puis cliquer sur
+**Générer le diagnostic préliminaire**. Le fichier d'alertes est lu une ligne à
+la fois. Les passages de la dernière recherche sont revérifiés dans les PDF.
+La simulation mock teste le format et les liaisons ; elle ne produit aucune
+hypothèse de défaillance inventée. Les mesures historiques restent réelles si
+l'événement provient de votre exécution MetroPT.
+
+API Python réutilisable après exécution du ML et indexation du RAG :
+
+```python
+import json
+from pathlib import Path
+from metropt_maintenance.diagnostic import generate_diagnostic
+from metropt_maintenance.rag import search_documents
+
+with Path("data/local/ml_baseline/agent_alerts.jsonl").open(encoding="utf-8") as source:
+    event = json.loads(next(source))
+retrieval = search_documents("Selon le DOE, comment les fuites affectent-elles un système d'air comprimé ?")
+diagnostic = generate_diagnostic(event, event["observed_signals"], retrieval)
+print(diagnostic.model_dump_json(indent=2))
+```
+
+Cette question sert à tester la liaison documentaire, elle ne démontre pas une
+fuite. Le schéma Pydantic contient les faits, hypothèses non confirmées, arguments,
+sources/pages, informations manquantes, contrôles et incertitude. Les faits sont
+construits par le code à partir des entrées. Le LLM sélectionne des citations,
+des liens vers les faits et des contrôles dans un catalogue documentaire ; il
+ne rédige aucune procédure de terrain libre. Une citation correcte ne prouve
+pas un lien causal. Le statut reste **« diagnostic préliminaire »**, avec
+validation humaine requise et aucune autorisation d'intervention.
+
+Pour un fournisseur compatible OpenAI Chat Completions et JSON Schema strict :
+
+```bash
+export LLM_PROVIDER=openai_compatible
+export LLM_BASE_URL=https://api.openai.com/v1
+export LLM_MODEL=VOTRE_MODELE_COMPATIBLE
+export LLM_TIMEOUT_SECONDS=30
+```
+
+Renseigner `LLM_API_KEY` dans l'environnement de lancement via votre gestionnaire
+de secrets. Ne pas la versionner. Sous PowerShell, utiliser
+`$env:LLM_PROVIDER="mock"`, puis la même syntaxe pour les autres variables.
+`.env.example` documente les variables ; le code ne charge pas automatiquement
+un fichier `.env`. Le modèle choisi doit accepter `response_format=json_schema`
+strict et `max_completion_tokens`. Les erreurs de fournisseur sont explicites,
+sans repli silencieux vers le mock. En mode API, les mesures et extraits validés
+sont envoyés au fournisseur configuré lors du clic de génération.
+
+Sans sources exploitables, le résultat indique `information_insuffisante` et
+aucun appel LLM n'a lieu. Une réponse mal formée, une source inventée ou une
+citation absente du PDF est rejetée. Aucun appel à une API LLM réelle n'a été
+effectué pendant cette validation : le protocole HTTP est testé par simulation.
+Contrat, états d'erreur et limites : `docs/diagnostic_preliminaire.md`.
 
 ## Organisation du code
 
@@ -380,8 +459,14 @@ metropt_maintenance/
     embeddings.py               Sentence Transformers local, révision fixée
     index.py                    ChromaDB et remplacement de l'index actif
     search.py                   search_documents et abstention
+    safety.py                   refus heuristique de demandes explicites à risque
     evaluation.py               qualité sur questions et pages annotées
     __main__.py                 préparation, indexation, recherche, évaluation
+  diagnostic/
+    schemas.py                  entrées, sélection LLM et résultat Pydantic
+    grounding.py                mesures et références vérifiées dans les PDF
+    providers.py                mock et fournisseur API configurable
+    service.py                  generate_diagnostic et assemblage contrôlé
   orchestration/,
   maintenance/, storage/        dossiers réservés, aucune implémentation
  documents/                     PDF locaux et exemple de registre de provenance
@@ -392,7 +477,8 @@ metropt_maintenance/
 ```
 
 `requirements.txt` contient maintenant Streamlit, Pytest, Pandas, NumPy, Plotly,
-Requests, Scikit-learn, Joblib, PyMuPDF, Sentence Transformers et ChromaDB.
+Requests, Scikit-learn, Joblib, PyMuPDF, Sentence Transformers, ChromaDB,
+Pydantic et HTTPX.
 Les autres bibliothèques de la stack seront ajoutées lors de leur
 utilisation. SQLite temporaire utilise `sqlite3` fourni avec Python. Les bornes
 de versions ne remplacent pas un verrouillage exact de l'environnement.

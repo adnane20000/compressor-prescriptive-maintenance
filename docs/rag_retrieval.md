@@ -5,7 +5,9 @@
 La chaîne lit les PDF de `documents/`, extrait le texte avec PyMuPDF, découpe des
 passages, les encode avec Sentence Transformers et les stocke dans ChromaDB.
 `search_documents(question)` retourne les passages et leurs références.
-Il n'y a ni génération LLM, ni agent autonome, ni diagnostic ou procédure inventée.
+Le module RAG ne génère pas de réponse LLM. Le module distinct `diagnostic`
+consomme ses passages vérifiés pour un diagnostic préliminaire structuré ;
+voir `docs/diagnostic_preliminaire.md`. Aucun agent autonome n'est ajouté.
 
 Le seul document réel disponible pour la validation initiale présentée ici était
 `Data Description_Metro.pdf`, distribué dans
@@ -15,6 +17,7 @@ Il décrit le dataset : **ce n'est pas un manuel constructeur**. Depuis, quatre
 ouvrages généraux ont été importés ; leur provenance, leur portée et leurs tests
 sont décrits dans `docs/rag_corpus_import.md`. Cette section conserve les mesures
 historiques sur le seul PDF UCI, sans les extrapoler au corpus étendu.
+Les deux guides INRS ajoutés ensuite sont décrits dans `docs/inrs_safety_import.md`.
 
 Empreinte du PDF :
 
@@ -65,6 +68,10 @@ sont déterministes et liés au chemin, au contenu PDF, à la page et aux offset
 Les passages sont envoyés à Chroma par lots de 32. Une nouvelle collection
 n'est déclarée active qu'après réussite. Une erreur d'embedding conserve
 l'ancien index actif. Une réindexation réussie ne double pas les passages actifs.
+Les vecteurs existants sont réutilisés uniquement pour les mêmes identifiants
+de chunks, avec une signature d'encodeur et des paramètres de découpage identiques.
+Les textes et métadonnées sont toujours relus ; `reuse_embeddings=False` force
+le réencodage complet depuis l'API Python.
 
 Les recherches vérifient l'inventaire et les empreintes du corpus, ainsi que
 le registre. Ajout, suppression ou modification d'un PDF imposent une
