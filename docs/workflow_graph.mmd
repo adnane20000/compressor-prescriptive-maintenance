@@ -1,0 +1,30 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	monitor_node(monitor_node)
+	anomaly_router(anomaly_router)
+	retrieval_node(retrieval_node)
+	diagnosis_node(diagnosis_node)
+	planning_node(planning_node)
+	human_review_node(human_review_node)
+	finalize_node(finalize_node)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> monitor_node;
+	anomaly_router -. &nbsp;normal&nbsp; .-> finalize_node;
+	anomaly_router -. &nbsp;error&nbsp; .-> planning_node;
+	anomaly_router -. &nbsp;anomaly&nbsp; .-> retrieval_node;
+	diagnosis_node --> planning_node;
+	human_review_node -. &nbsp;True&nbsp; .-> finalize_node;
+	monitor_node --> anomaly_router;
+	planning_node --> human_review_node;
+	retrieval_node -. &nbsp;True&nbsp; .-> diagnosis_node;
+	retrieval_node -. &nbsp;False&nbsp; .-> planning_node;
+	finalize_node --> __end__;
+	human_review_node -. &nbsp;False&nbsp; .-> human_review_node;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc

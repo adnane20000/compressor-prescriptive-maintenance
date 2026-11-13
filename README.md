@@ -3,9 +3,11 @@
 Prototype académique de maintenance prescriptive du compresseur MetroPT-3.
 Le projet implémente l'acquisition CSV, l'exploration, les rapports avec graphiques,
 le rejeu chronologique, une baseline ML Isolation Forest, la recherche documentaire
-RAG et un diagnostic préliminaire structuré avec fournisseur LLM configurable.
+RAG, un diagnostic préliminaire structuré avec fournisseur LLM configurable et
+un workflow LangGraph avec checkpoints, revue humaine et décisions locales.
 Le mode mock fonctionne sans clé API et s'affiche comme une simulation.
-LangGraph et les propositions de maintenance restent à implémenter.
+Les propositions préparent une revue documentaire avant intervention ; aucune
+procédure physique n'est créée sans documents applicables à l'équipement.
 
 ## Installer et lancer
 
@@ -431,6 +433,86 @@ citation absente du PDF est rejetée. Aucun appel à une API LLM réelle n'a ét
 effectué pendant cette validation : le protocole HTTP est testé par simulation.
 Contrat, états d'erreur et limites : `docs/diagnostic_preliminaire.md`.
 
+## Workflow LangGraph et revue humaine
+
+Après mise à jour des dépendances, utiliser la section **Workflow LangGraph** du
+dashboard. Elle réutilise le CSV local et le modèle entraîné, puis le RAG et le
+diagnostic configurés. Aucun entraînement ni recalibrage n'est effectué pendant
+le workflow. Les chemins RAG du workflow sont `documents/` et `data/local/rag/`.
+
+```bash
+python -m pip install -r requirements.txt
+python -m streamlit run app.py --browser.gatherUsageStats=false
+```
+
+Choisir un intervalle avec au moins cinq minutes de contexte avant la minute
+analysée, et une mesure ultérieure permettant de la fermer. La **dernière minute
+close** est la cible ; les minutes précédentes servent de contexte. La lecture
+CSV est faite par blocs et refuse plus de 6 000 mesures sélectionnées. Un trou
+réinitialise les variables temporelles. Des données insuffisantes ne sont jamais
+traitées comme une fenêtre normale.
+
+```mermaid
+flowchart TD
+    M[monitor_node : ML] --> A[anomaly_router]
+    A -->|fenêtre normale| F[finalize_node : décision SQLite]
+    A -->|anomalie| R[retrieval_node : RAG]
+    A -->|erreur ou données insuffisantes| P[planning_node : proposition documentaire]
+    R -->|passages exploitables| D[diagnosis_node : diagnostic préliminaire]
+    R -->|sources absentes, refus ou erreur| P
+    D --> P
+    P --> H[human_review_node : interruption persistante]
+    H -->|soumission invalide ou approbation bloquée| H
+    H -->|décision humaine recevable| F
+```
+
+Une fenêtre normale est clôturée **sans RAG, sans LLM et sans validation humaine**.
+Une anomalie conduit à une proposition documentaire ; les erreurs ou sources
+absentes produisent un dossier bloqué dont l'approbation est refusée. Le relecteur
+peut demander des informations ou refuser le dossier. Quand il est recevable,
+il peut approuver sa préparation documentaire. Nom, commentaire, choix explicite
+et confirmation sont nécessaires ; aucun choix d'approbation n'est présélectionné.
+Toute décision reste sans autorisation ni déclenchement d'intervention physique.
+
+API Python, avec un intervalle historique réel et un modèle local déjà entraîné :
+
+```python
+from metropt_maintenance.orchestration import open_workflow
+from metropt_maintenance.orchestration.monitoring import load_measurement_window
+
+request = load_measurement_window(
+    "data/raw/MetroPT3(AirCompressor).csv",
+    "2020-03-01 04:08:00", "2020-03-01 04:15:30",
+    data_context="historical_replay",
+    question="Selon le DOE, comment les fuites affectent-elles un système d'air comprimé ?",
+)
+with open_workflow() as runner:
+    state = runner.start(request)
+    print(state["run_id"], state["phase"])
+    print(state["interrupts"])
+```
+
+La question sur les fuites sert à éprouver la liaison documentaire ; elle ne
+constitue pas une identification de cause. Enregistrer l'identifiant pour
+rouvrir le dossier dans Streamlit ou via `runner.get_state(run_id)`. La reprise
+ne relance pas les étapes précédentes. Le contrat de `runner.review()` et les
+conditions exactes de chaque transition figurent dans `docs/workflow_langgraph.md`.
+
+L'état typé conserve mesures, résultat ML, passages, diagnostic, proposition,
+revue, erreurs et journal. Le checkpointer SQLite est dans
+`data/local/workflow/checkpoints.sqlite` ; les décisions idempotentes sont dans
+`data/local/workflow/decisions.sqlite`. Les bases restent ignorées par Git. Le
+journal utilise des dates UTC explicites ; le fuseau des mesures MetroPT reste
+non documenté. Aucun client ou secret LLM n'est stocké dans les checkpoints et
+le traçage distant LangSmith est désactivé dans l'API du workflow.
+
+**Validation exécutée : 204 tests réussis**, dont 37 tests du workflow et de sa
+persistance. Un essai distinct sur 45 mesures réelles a retrouvé l'anomalie de la
+minute close à 04:15 le 1er mars 2020, puis les passages DOE. Le diagnostic mock
+a été conservé et le checkpoint rouvert ; le dossier reste **en attente**, sans
+revue ni décision humaine émise. Rapport : `docs/workflow_integration_metrics.json`.
+Aucune API LLM réelle n'a été appelée pendant ces vérifications.
+
 ## Organisation du code
 
 ```text
@@ -467,8 +549,13 @@ metropt_maintenance/
     grounding.py                mesures et références vérifiées dans les PDF
     providers.py                mock et fournisseur API configurable
     service.py                  generate_diagnostic et assemblage contrôlé
-  orchestration/,
-  maintenance/, storage/        dossiers réservés, aucune implémentation
+  orchestration/
+    state.py                    WorkflowState typé, entrées et revue Pydantic
+    monitoring.py               lecture bornée et adaptation au ML existant
+    nodes.py                    les sept nœuds et journal de chaque étape
+    graph.py                    graphe, checkpointer et API start/review/retry
+  maintenance/proposal.py       proposition documentaire, sans procédure physique
+  storage/decisions.py          décisions SQLite idempotentes
  documents/                     PDF locaux et exemple de registre de provenance
  data/raw/                      CSV locaux ignorés par Git
  data/local/                    rapports et futurs artefacts locaux
@@ -478,7 +565,7 @@ metropt_maintenance/
 
 `requirements.txt` contient maintenant Streamlit, Pytest, Pandas, NumPy, Plotly,
 Requests, Scikit-learn, Joblib, PyMuPDF, Sentence Transformers, ChromaDB,
-Pydantic et HTTPX.
+Pydantic, HTTPX, LangGraph et son checkpointer SQLite.
 Les autres bibliothèques de la stack seront ajoutées lors de leur
 utilisation. SQLite temporaire utilise `sqlite3` fourni avec Python. Les bornes
 de versions ne remplacent pas un verrouillage exact de l'environnement.

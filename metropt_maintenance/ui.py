@@ -3,6 +3,7 @@
 from pathlib import Path
 import json
 import os
+import sqlite3
 
 import pandas as pd
 import streamlit as st
@@ -67,6 +68,71 @@ def _diagnostic_panel() -> None:
         st.write(f"Statut : {result.statut} — {result.etat_generation} ; incertitude {result.niveau_incertitude}.")
         st.caption("Ce résultat n'autorise aucune intervention. Aucun contrôle physique n'est déclenché.")
         st.json(result.model_dump(mode="json"))
+
+
+def _workflow_panel(csv_path: Path) -> None:
+    """Démarrer un dossier borné et soumettre une revue explicite au checkpoint."""
+    from .orchestration import open_workflow
+    from .orchestration.monitoring import load_measurement_window
+    from .orchestration.nodes import WorkflowPersistenceError
+
+    st.subheader("Workflow LangGraph — revue humaine persistante")
+    st.caption("La dernière minute close est analysée avec son contexte passé. Fournir au moins six minutes closes et une mesure suivante. Les checkpoints et décisions restent locaux ; aucune commande d'équipement.")
+    model_path = st.text_input("Modèle local de confiance du workflow", value="models/isolation_forest/baseline.joblib")
+    start = st.text_input("Début du contexte du workflow", value="2020-03-01 04:08:00")
+    end = st.text_input("Fin des mesures du workflow", value="2020-03-01 04:15:30")
+    context = st.selectbox("Origine déclarée des mesures du workflow", ["Historique rejoué", "Synthétique (test)"])
+    question = st.text_input("Question documentaire du workflow", value="Quels documents décrivent Oil_temperature, Motor_current, TP2 et TP3 ?")
+    if st.button("Démarrer le workflow sur cette fenêtre"):
+        try:
+            with st.spinner("Analyse ML et parcours du graphe jusqu'à la clôture ou la revue…"):
+                request = load_measurement_window(csv_path, start, end, data_context="historical_replay" if context == "Historique rejoué" else "synthetic_test", question=question)
+                with open_workflow(model_path=model_path) as runner:
+                    state = runner.start(request)
+            st.session_state.workflow_active_id = state["run_id"]
+        except WorkflowPersistenceError as error:
+            st.session_state.workflow_active_id = error.run_id
+            st.error(str(error))
+        except (OSError, ValueError, sqlite3.Error) as error:
+            st.error(str(error))
+    reopen = st.text_input("Identifiant du dossier à rouvrir", value="")
+    if st.button("Rouvrir le dossier enregistré"):
+        try:
+            with open_workflow(model_path=model_path) as runner:
+                runner.get_state(reopen)
+            st.session_state.workflow_active_id = reopen
+        except (OSError, ValueError, KeyError, sqlite3.Error) as error:
+            st.error(str(error))
+    run_id = st.session_state.get("workflow_active_id")
+    if not run_id:
+        return
+    try:
+        with open_workflow(model_path=model_path) as runner:
+            state = runner.get_state(run_id)
+            st.write(f"Dossier : {run_id}")
+            if state["interrupts"]:
+                st.warning("En attente de revue humaine. La proposition ne contient aucune procédure physique et n'autorise aucune intervention.")
+                st.json(state["proposal"])
+                choices = {"Choisir une décision": None, "Refuser": "reject", "Demander des informations": "request_information"}
+                if state["proposal"]["approval_allowed"]:
+                    choices["Approuver la préparation documentaire"] = "approve"
+                choice = choices[st.selectbox("Décision humaine sur ce dossier", list(choices), key=f"workflow_choice_{run_id}")]
+                reviewer = st.text_input("Identité du relecteur", key=f"workflow_reviewer_{run_id}")
+                comment = st.text_area("Commentaire de la revue", key=f"workflow_comment_{run_id}")
+                acknowledged = st.checkbox("Je confirme cette revue documentaire ; aucune intervention physique n'est autorisée.", key=f"workflow_ack_{run_id}")
+                if st.button("Envoyer la revue humaine", disabled=not (choice and reviewer.strip() and comment.strip() and acknowledged)):
+                    state = runner.review(run_id, {"proposal_id": state["proposal"]["proposal_id"], "decision": choice,
+                                                  "reviewer": reviewer, "comment": comment, "acknowledged": acknowledged})
+                if state["review_error"]:
+                    st.error(state["review_error"])
+            elif state["pending_nodes"] == ["finalize_node"]:
+                if st.button("Réessayer l'enregistrement de la décision"):
+                    state = runner.retry_finalization(run_id)
+            st.write(f"État du workflow : {state['phase']}")
+            st.dataframe(pd.DataFrame(state["journal"]), hide_index=True)
+            st.json({key: state[key] for key in ("ml_event", "monitoring_summary", "retrieval", "diagnostic", "proposal", "review", "decision", "errors")})
+    except (OSError, ValueError, KeyError, sqlite3.Error, WorkflowPersistenceError) as error:
+        st.error(str(error))
 
 
 def _rag_panel() -> None:
@@ -300,4 +366,5 @@ def main() -> None:
     _ml_panel(path, identity)
     _rag_panel()
     _diagnostic_panel()
+    _workflow_panel(path)
     _replay_panel(path, identity)

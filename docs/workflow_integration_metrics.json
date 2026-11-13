@@ -1,0 +1,152 @@
+{
+  "protocol": "Fenêtre réelle MetroPT ; modèle local existant ; RAG E5 local ; diagnostic mock ; aucune soumission de revue humaine.",
+  "request_start": "2020-03-01T04:08:05",
+  "request_end": "2020-03-01T04:15:21",
+  "sample_count": 45,
+  "monitored_event": {
+    "schema_version": "anomaly-observation-v1",
+    "model_id": "2435e546bca6e2323ff0",
+    "source_file_sha256": null,
+    "data_context": "historical_replay",
+    "window_start": "2020-03-01T04:14:00",
+    "available_at": "2020-03-01T04:15:00",
+    "status": "scored",
+    "anomaly_score": 0.6884785168875887,
+    "partition": "test",
+    "threshold": 0.6590230212367194,
+    "is_anomaly": true,
+    "score_is_failure_probability": false,
+    "mode_interpreted": "charge probable",
+    "mode_mixed": true,
+    "sample_count": 6,
+    "missing_fraction": 0.0,
+    "observed_signals": {
+      "Oil_temperature": {
+        "aggregation": "minute_mean",
+        "value": 66.49166666666666,
+        "unit": "°C"
+      },
+      "Motor_current": {
+        "aggregation": "minute_mean",
+        "value": 5.739999999999999,
+        "unit": "A"
+      },
+      "TP2": {
+        "aggregation": "minute_mean",
+        "value": 8.537999999999998,
+        "unit": "bar"
+      },
+      "TP3": {
+        "aggregation": "minute_mean",
+        "value": 9.934666666666667,
+        "unit": "bar"
+      }
+    },
+    "cause": null,
+    "diagnosis_confirmed": false,
+    "requires_human_review": true,
+    "interpretation": "Écart statistique à la référence apprise ; aucune cause identifiée."
+  },
+  "phase": "awaiting_human",
+  "route": "anomaly",
+  "checkpoint_reopened": true,
+  "pending_nodes": [
+    "human_review_node"
+  ],
+  "review_submitted": false,
+  "decision_recorded": false,
+  "llm_mode": "mock",
+  "mock_calls": 1,
+  "real_llm_api_called": false,
+  "diagnostic_status": "ok",
+  "proposal_status": "proposition non validée",
+  "physical_procedure": null,
+  "intervention_authorized": false,
+  "references": [
+    {
+      "source_id": "S1",
+      "file_name": "compressed_air_sourcebook.pdf",
+      "page": 22,
+      "pdf_sha256": "deeaf015ddfa026330f3ff9af877395c0b92e095851ed2c585afaf2d36b77e19",
+      "applicability": "general_reference",
+      "equipment_reference": ""
+    },
+    {
+      "source_id": "S2",
+      "file_name": "compressed_air_sourcebook.pdf",
+      "page": 34,
+      "pdf_sha256": "deeaf015ddfa026330f3ff9af877395c0b92e095851ed2c585afaf2d36b77e19",
+      "applicability": "general_reference",
+      "equipment_reference": ""
+    },
+    {
+      "source_id": "S3",
+      "file_name": "compressed_air_sourcebook.pdf",
+      "page": 21,
+      "pdf_sha256": "deeaf015ddfa026330f3ff9af877395c0b92e095851ed2c585afaf2d36b77e19",
+      "applicability": "general_reference",
+      "equipment_reference": ""
+    },
+    {
+      "source_id": "S4",
+      "file_name": "compressed_air_sourcebook.pdf",
+      "page": 93,
+      "pdf_sha256": "deeaf015ddfa026330f3ff9af877395c0b92e095851ed2c585afaf2d36b77e19",
+      "applicability": "general_reference",
+      "equipment_reference": ""
+    },
+    {
+      "source_id": "S5",
+      "file_name": "compressed_air_sourcebook.pdf",
+      "page": 62,
+      "pdf_sha256": "deeaf015ddfa026330f3ff9af877395c0b92e095851ed2c585afaf2d36b77e19",
+      "applicability": "general_reference",
+      "equipment_reference": ""
+    }
+  ],
+  "journal": [
+    {
+      "sequence": 1,
+      "node": "monitor_node",
+      "status": "scored",
+      "timestamp_utc": "2026-11-13T16:01:11.958868+00:00"
+    },
+    {
+      "sequence": 2,
+      "node": "anomaly_router",
+      "status": "anomaly",
+      "timestamp_utc": "2026-11-13T16:01:11.964640+00:00"
+    },
+    {
+      "sequence": 3,
+      "node": "retrieval_node",
+      "status": "passages_found",
+      "timestamp_utc": "2026-11-13T16:01:19.919545+00:00"
+    },
+    {
+      "sequence": 4,
+      "node": "diagnosis_node",
+      "status": "ok",
+      "timestamp_utc": "2026-11-13T16:01:20.037118+00:00"
+    },
+    {
+      "sequence": 5,
+      "node": "planning_node",
+      "status": "proposed",
+      "timestamp_utc": "2026-11-13T16:01:20.039590+00:00"
+    },
+    {
+      "sequence": 6,
+      "node": "human_review_node",
+      "status": "awaiting_review",
+      "timestamp_utc": "2026-11-13T16:01:20.039607+00:00"
+    }
+  ],
+  "versions": {
+    "langgraph": "1.2.21",
+    "langgraph-checkpoint-sqlite": "3.1.3",
+    "pydantic": "2.14.3"
+  },
+  "limits": "Un seul dossier d'intégration ; aucune évaluation de justesse diagnostique, causalité ou sécurité réelle. La question documentaire sur les fuites n'est pas une identification de cause.",
+  "checkpoint_reopened_in_new_process": true
+}

@@ -3,7 +3,8 @@
 Le module `metropt_maintenance.diagnostic` relie un événement d'anomalie, des
 mesures disponibles et des passages du RAG. Il propose un dossier préliminaire
 à examiner, sans confirmer de cause ni définir de procédure physique. Aucun
-agent autonome, LangGraph ou historique métier n'est ajouté.
+outil autonome ni commande physique n'est ajouté par ce module. Le workflow
+distinct et ses décisions locales sont décrits dans `docs/workflow_langgraph.md`.
 
 ## Contrat public
 
@@ -132,7 +133,9 @@ taille de réponse et les références sont contrôlées après l'appel.
 
 ## Vérifications réellement effectuées
 
-`python -m pytest` : **167 tests réussis**, dont **36** pour le diagnostic.
+Lors de la livraison de ce module, `python -m pytest` : **167 tests réussis**,
+dont **36** pour le diagnostic. Les vérifications plus récentes du workflow
+sont documentées dans `docs/workflow_langgraph.md`.
 Les tests couvrent le mock sans réseau, le protocole HTTP avec `MockTransport`,
 les erreurs 401/429/500, timeouts, connexion, configuration, JSON invalide,
 refus/troncature, inventions de mesures/normes/contrôles, références falsifiées,
