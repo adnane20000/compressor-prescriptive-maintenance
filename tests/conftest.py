@@ -29,3 +29,32 @@ def make_csv(tmp_path):
                 writer.writerow(([position * 10] if with_index else []) + [row[name] for name in REQUIRED_COLUMNS])
         return path
     return factory
+
+
+@pytest.fixture
+def ml_measurements():
+    """Trois heures SYNTHÉTIQUES à six mesures/minute, jamais des données MetroPT réelles."""
+    import numpy as np
+    import pandas as pd
+    dates = pd.date_range("2020-02-01", periods=1081, freq="10s")
+    rng = np.random.default_rng(7)
+    data = {"timestamp": dates}
+    for name in SIGNAL_NAMES:
+        data[name] = np.ones(len(dates))
+    for name, level in [("TP2", 8), ("TP3", 9), ("H1", 9), ("Reservoirs", 9), ("Oil_temperature", 50), ("Motor_current", 4), ("DV_pressure", 0)]:
+        data[name] = level + rng.normal(0, 0.05, len(dates))
+    data["DV_eletric"] = np.zeros(len(dates))
+    return pd.DataFrame(data)
+
+
+@pytest.fixture
+def ml_features(ml_measurements):
+    from metropt_maintenance.ml.features import aggregate_minutes, engineer_features
+    return engineer_features(aggregate_minutes([ml_measurements]))
+
+
+@pytest.fixture
+def ml_config():
+    from metropt_maintenance.ml.model import ModelConfig
+    return ModelConfig(train_end="2020-02-01 01:00:00", calibration_end="2020-02-01 02:00:00",
+                       n_estimators=12, max_samples=32, min_partition_windows=8)

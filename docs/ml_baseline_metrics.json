@@ -1,0 +1,278 @@
+{
+  "limitations": "Comparaison descriptive avec quatre périodes externes documentées, jamais utilisées pour ajuster le modèle ou le seuil. Les dates hors période sont non étiquetées, pas des exemples normaux confirmés. Précision, F1, ROC-AUC et taux de faux positifs ne sont pas estimables ici. Une association temporelle ne démontre pas une cause, une anticipation ni une détection de fuite. Bornes documentées à la minute : la minute de fin est incluse.",
+  "by_split": [
+    {
+      "split": "train",
+      "windows": 26461,
+      "scored_windows": 26301,
+      "alert_windows": 273,
+      "alert_rate": 0.010379833466408122,
+      "score_median": 0.38388062626618763
+    },
+    {
+      "split": "calibration",
+      "windows": 9064,
+      "scored_windows": 9031,
+      "alert_windows": 90,
+      "alert_rate": 0.009965673790277931,
+      "score_median": 0.3868222364940752
+    },
+    {
+      "split": "test",
+      "windows": 217194,
+      "scored_windows": 215611,
+      "alert_windows": 33491,
+      "alert_rate": 0.15533066494752124,
+      "score_median": 0.4918974271270958
+    }
+  ],
+  "by_mode": [
+    {
+      "split": "train",
+      "mode": "arrêt probable",
+      "windows": 19030,
+      "scored_windows": 18980,
+      "alert_windows": 0,
+      "alert_rate": 0.0
+    },
+    {
+      "split": "train",
+      "mode": "charge probable",
+      "windows": 1470,
+      "scored_windows": 1464,
+      "alert_windows": 191,
+      "alert_rate": 0.13046448087431695
+    },
+    {
+      "split": "train",
+      "mode": "marche à vide probable",
+      "windows": 5961,
+      "scored_windows": 5857,
+      "alert_windows": 82,
+      "alert_rate": 0.014000341471743213
+    },
+    {
+      "split": "calibration",
+      "mode": "arrêt probable",
+      "windows": 6462,
+      "scored_windows": 6457,
+      "alert_windows": 0,
+      "alert_rate": 0.0
+    },
+    {
+      "split": "calibration",
+      "mode": "charge probable",
+      "windows": 506,
+      "scored_windows": 504,
+      "alert_windows": 54,
+      "alert_rate": 0.10714285714285714
+    },
+    {
+      "split": "calibration",
+      "mode": "marche à vide probable",
+      "windows": 2096,
+      "scored_windows": 2070,
+      "alert_windows": 36,
+      "alert_rate": 0.017391304347826087
+    },
+    {
+      "split": "test",
+      "mode": "marche à vide probable",
+      "windows": 64914,
+      "scored_windows": 64172,
+      "alert_windows": 4148,
+      "alert_rate": 0.06463878326996197
+    },
+    {
+      "split": "test",
+      "mode": "arrêt probable",
+      "windows": 113601,
+      "scored_windows": 113493,
+      "alert_windows": 41,
+      "alert_rate": 0.00036125576026715305
+    },
+    {
+      "split": "test",
+      "mode": "charge probable",
+      "windows": 36666,
+      "scored_windows": 35952,
+      "alert_windows": 29257,
+      "alert_rate": 0.8137794837561193
+    },
+    {
+      "split": "test",
+      "mode": "indéterminé",
+      "windows": 2013,
+      "scored_windows": 1994,
+      "alert_windows": 45,
+      "alert_rate": 0.022567703109327986
+    }
+  ],
+  "documented_period_comparisons": [
+    {
+      "identifier": "uci-period-1",
+      "start": "2020-04-18 00:00:00",
+      "end": "2020-04-18 23:59:00",
+      "reported_condition": "Air leak",
+      "source": "https://archive.ics.uci.edu/dataset/791/metropt+3+",
+      "source_section": "Failure Information ; également Data Description_Metro.pdf de l'archive UCI",
+      "end_exclusive_for_minute_comparison": "2020-04-19T00:00:00",
+      "available_windows": 1436,
+      "scored_windows": 1430,
+      "unscored_windows": 6,
+      "expected_minutes_in_documented_interval": 1440,
+      "alert_windows": 1412,
+      "alert_rate_among_scored": 0.9874125874125874,
+      "has_alert": true,
+      "first_alert_available_at": "2020-04-18T00:29:00",
+      "delay_after_documented_start_seconds": 1740.0
+    },
+    {
+      "identifier": "uci-period-2",
+      "start": "2020-05-29 23:30:00",
+      "end": "2020-05-30 06:00:00",
+      "reported_condition": "Air leak",
+      "source": "https://archive.ics.uci.edu/dataset/791/metropt+3+",
+      "source_section": "Failure Information ; également Data Description_Metro.pdf de l'archive UCI",
+      "end_exclusive_for_minute_comparison": "2020-05-30T06:01:00",
+      "available_windows": 391,
+      "scored_windows": 391,
+      "unscored_windows": 0,
+      "expected_minutes_in_documented_interval": 391,
+      "alert_windows": 387,
+      "alert_rate_among_scored": 0.989769820971867,
+      "has_alert": true,
+      "first_alert_available_at": "2020-05-29T23:31:00",
+      "delay_after_documented_start_seconds": 60.0
+    },
+    {
+      "identifier": "uci-period-3",
+      "start": "2020-06-05 10:00:00",
+      "end": "2020-06-07 14:30:00",
+      "reported_condition": "Air leak",
+      "source": "https://archive.ics.uci.edu/dataset/791/metropt+3+",
+      "source_section": "Failure Information ; également Data Description_Metro.pdf de l'archive UCI",
+      "end_exclusive_for_minute_comparison": "2020-06-07T14:31:00",
+      "available_windows": 2863,
+      "scored_windows": 2852,
+      "unscored_windows": 11,
+      "expected_minutes_in_documented_interval": 3151,
+      "alert_windows": 2852,
+      "alert_rate_among_scored": 1.0,
+      "has_alert": true,
+      "first_alert_available_at": "2020-06-05T10:01:00",
+      "delay_after_documented_start_seconds": 60.0
+    },
+    {
+      "identifier": "uci-period-4",
+      "start": "2020-07-15 14:30:00",
+      "end": "2020-07-15 19:00:00",
+      "reported_condition": "Air leak",
+      "source": "https://archive.ics.uci.edu/dataset/791/metropt+3+",
+      "source_section": "Failure Information ; également Data Description_Metro.pdf de l'archive UCI",
+      "end_exclusive_for_minute_comparison": "2020-07-15T19:01:00",
+      "available_windows": 270,
+      "scored_windows": 265,
+      "unscored_windows": 5,
+      "expected_minutes_in_documented_interval": 271,
+      "alert_windows": 233,
+      "alert_rate_among_scored": 0.879245283018868,
+      "has_alert": true,
+      "first_alert_available_at": "2020-07-15T14:31:00",
+      "delay_after_documented_start_seconds": 60.0
+    }
+  ],
+  "documented_periods_with_observations": 4,
+  "documented_periods_with_alert": 4,
+  "test_alert_episodes": 9615,
+  "test_alerts_outside_documented_periods": 28607,
+  "test_scored_windows_outside_documented_periods": 210673,
+  "outside_period_status": "non étiqueté ; ces alertes ne sont pas des faux positifs confirmés",
+  "unavailable_supervised_metrics": [
+    "precision",
+    "F1",
+    "ROC-AUC",
+    "false_positive_rate"
+  ],
+  "model_id": "2435e546bca6e2323ff0",
+  "threshold": 0.6590230212367194,
+  "protocol": {
+    "train_end": "2020-02-22 00:00:00",
+    "calibration_end": "2020-03-01 00:00:00",
+    "calibration_tail_fraction": 0.01,
+    "n_estimators": 200,
+    "max_samples": 256,
+    "random_state": 42,
+    "max_train_windows": 50000,
+    "min_partition_windows": 128
+  },
+  "provenance": {
+    "source_reference": "https://archive.ics.uci.edu/dataset/791/metropt+3+",
+    "csv_path": "data/raw/MetroPT3(AirCompressor).csv",
+    "csv_sha256": "db30ccb4ea402e3c8bf2c99db06e288d4f2a772f6928f9dbe26a920d69793e24",
+    "csv_bytes": 218300507
+  },
+  "feature_columns": [
+    "TP2_mean",
+    "TP3_mean",
+    "H1_mean",
+    "DV_pressure_mean",
+    "Reservoirs_mean",
+    "Oil_temperature_mean",
+    "Motor_current_mean",
+    "COMP_mean",
+    "DV_eletric_mean",
+    "Towers_mean",
+    "MPG_mean",
+    "LPS_mean",
+    "Pressure_switch_mean",
+    "Oil_level_mean",
+    "Caudal_impulses_mean",
+    "TP2_std",
+    "TP3_std",
+    "H1_std",
+    "DV_pressure_std",
+    "Reservoirs_std",
+    "Oil_temperature_std",
+    "Motor_current_std",
+    "mode_fraction_0",
+    "mode_fraction_1",
+    "mode_fraction_2",
+    "mode_fraction_3",
+    "TP3_minus_TP2",
+    "Oil_temperature_lag1",
+    "Oil_temperature_delta1",
+    "Oil_temperature_past5_mean",
+    "Oil_temperature_past5_std",
+    "Motor_current_lag1",
+    "Motor_current_delta1",
+    "Motor_current_past5_mean",
+    "Motor_current_past5_std",
+    "TP2_lag1",
+    "TP2_delta1",
+    "TP2_past5_mean",
+    "TP2_past5_std",
+    "TP3_lag1",
+    "TP3_delta1",
+    "TP3_past5_mean",
+    "TP3_past5_std"
+  ],
+  "feature_version": "metropt-minute-causal-v1",
+  "raw_rows_read": 1516948,
+  "final_unclosed_raw_rows": 6,
+  "total_observed_windows": 252719,
+  "unscored_windows": 1776,
+  "unscored_by_status": {
+    "insufficient_history": 1660,
+    "insufficient_data": 116
+  },
+  "mode_mixed_windows": 34388,
+  "versions": {
+    "python": "3.12.14",
+    "sklearn": "1.9.1",
+    "pandas": "3.1.1",
+    "numpy": "2.5.4"
+  },
+  "generated_at_utc": "2026-11-13T00:16:42.820026+00:00",
+  "agent_alert_export_scope": "test_only"
+}

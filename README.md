@@ -1,8 +1,8 @@
-# MetroPT — acquisition, exploration et rejeu historique
+# MetroPT — exploration, anomalies ML et rejeu historique
 
 Prototype académique de maintenance prescriptive du compresseur MetroPT-3.
-Cette étape implémente l'acquisition CSV, l'exploration, un rapport avec graphiques
-et un rejeu chronologique. Elle fonctionne sans clé API. Le ML, le RAG, le LLM,
+Le projet implémente l'acquisition CSV, l'exploration, les rapports avec graphiques,
+le rejeu chronologique et une baseline ML Isolation Forest sans clé API. Le RAG, le LLM,
 LangGraph et les propositions de maintenance restent à implémenter.
 
 ## Installer et lancer
@@ -188,6 +188,71 @@ permettant un accès direct à la fin du CSV.
 
 **Il s'agit d'une simulation de données historiques, jamais de temps réel.**
 
+## Baseline Machine Learning
+
+Après installation des nouvelles dépendances :
+
+```bash
+python -m pip install -r requirements.txt
+python -m metropt_maintenance.ml "data/raw/MetroPT3(AirCompressor).csv"
+```
+
+Le dashboard propose aussi **Entraîner et évaluer Isolation Forest**. Cette
+opération traite le CSV complet, indépendamment du préfixe d'exploration.
+
+Le protocole par défaut est fixé avant l'analyse du test : entraînement sur les
+mesures antérieures au 22 février 2020, calibration du 22 février au 1er mars,
+test à partir du 1er mars. Les fenêtres représentent des minutes closes,
+horodatées à leur fin. Le seuil est le 99e percentile des scores de calibration ;
+ni le test ni les rapports de défaillance ne servent à le choisir.
+
+Les sorties locales sont :
+
+- `models/isolation_forest/baseline.joblib` : forêt, imputation, seuil et contrat ;
+- `models/isolation_forest/manifest.json` : paramètres, variables, versions et empreinte ;
+- `data/local/ml_baseline/report.html` : scores et comparaison descriptive aux périodes UCI ;
+- `data/local/ml_baseline/metrics.json` : métriques mesurées et provenance ;
+- `data/local/ml_baseline/predictions.csv` : toutes les fenêtres, y compris non scorées ;
+- `data/local/ml_baseline/agent_alerts.jsonl` : alertes du test et observations pour futurs agents ;
+- `data/local/ml_baseline/score_plot_data.csv` : maxima horaires pour affichage réduit.
+
+Le prétraitement utilise les 15 vrais signaux, des moyennes et variations par
+minute, des fractions de modes, des retards et les cinq minutes précédentes.
+Les trous temporels réinitialisent l'historique. Les fenêtres sans historique,
+trop pauvres ou trop incomplètes ne sont pas scorées ; les autres valeurs absentes
+sont imputées avec les seules médianes d'entraînement. Les fenêtres réduites
+restent en mémoire ; les 1,5 million de lignes brutes sont lues par blocs.
+
+API réutilisable après entraînement, avec contexte historique suffisant :
+
+```python
+from metropt_maintenance.ml import load_model, predict_anomaly
+from metropt_maintenance.ml.features import build_features
+from metropt_maintenance.ml.workflow import prediction_to_record
+
+model = load_model("models/isolation_forest/baseline.joblib")
+features = build_features("data/raw/MetroPT3(AirCompressor).csv")
+predictions = predict_anomaly(model, features)
+record = prediction_to_record(predictions.iloc[-1].to_dict(), model_id=model.model_id)
+```
+
+`predict_anomaly()` attend les variables causales, pas une ligne brute isolée.
+Pour une séquence courte, utiliser `aggregate_minutes()` puis `engineer_features()`
+sur au moins cinq minutes précédentes et la minute à scorer, en conservant aussi
+une mesure ultérieure pour finaliser le dernier intervalle. Ne charger que des
+artefacts locaux de confiance ; Joblib utilise la sérialisation Python. Une
+version scikit-learn différente nécessite de recréer le modèle.
+
+**Résultat réel de cette baseline** : seuil 0,659023 ; 33 491 alertes sur 215 611
+fenêtres de test scorées, soit 15,53 %. Des alertes recouvrent les quatre périodes
+documentées, mais la charge est très élevée en mode charge (81,38 % des fenêtres
+scorées de ce mode). Cette baseline globale reste à améliorer ; ces nombres ne
+mesurent ni précision, ni probabilité de panne, ni identification de fuite.
+
+Le protocole, les limites, les métriques par mode et la comparaison aux rapports
+UCI sont détaillés dans `docs/ml_baseline.md`. Un instantané vérifiable des
+résultats réels figure dans `docs/ml_baseline_metrics.json`.
+
 ## Organisation du code
 
 ```text
@@ -203,7 +268,14 @@ metropt_maintenance/
     report.py                   agrégats, graphiques et rapport autonome
     replay.py                   événements historiques et délais calculés
     __main__.py                 commandes download / explore / replay
-  ml/, rag/, orchestration/,
+  ml/
+    features.py                 fenêtres et variables temporelles causales
+    model.py                    entraînement, seuil, predict_anomaly, persistance
+    evaluation.py               périodes documentées et comparaison descriptive
+    workflow.py                 exécution et observations JSON pour agents
+    report.py                   courbes des scores et rapport ML
+    __main__.py                 commande de baseline complète
+  rag/, orchestration/,
   maintenance/, storage/        dossiers réservés, aucune implémentation
  data/raw/                      CSV locaux ignorés par Git
  data/local/                    rapports et futurs artefacts locaux
@@ -211,8 +283,8 @@ metropt_maintenance/
  tests/                         tests synthétiques et intégration Streamlit
 ```
 
-`requirements.txt` contient maintenant Streamlit, Pytest, Pandas, NumPy, Plotly
-et Requests. Les autres bibliothèques de la stack seront ajoutées lors de leur
+`requirements.txt` contient maintenant Streamlit, Pytest, Pandas, NumPy, Plotly,
+Requests, Scikit-learn et Joblib. Les autres bibliothèques de la stack seront ajoutées lors de leur
 utilisation. SQLite temporaire utilise `sqlite3` fourni avec Python. Les bornes
 de versions ne remplacent pas un verrouillage exact de l'environnement.
 
@@ -235,9 +307,10 @@ sont expliqués dans `docs/exploration_metropt3.md`. Le rapport généré est da
 
 ## Suite du projet
 
-Avant le ML : examiner des fenêtres temporelles plus courtes, discuter les
-transitions et les règles de mode avec l'encadrant, puis définir un découpage
-chronologique et un protocole d'évaluation. Ne pas transformer les modes de
+Examiner la charge d'alertes par mode avec l'encadrant et définir une prochaine
+expérience, par exemple une référence conditionnée par le mode. Préserver un
+nouveau jeu de test pour cette comparaison : ne pas optimiser rétrospectivement
+le seuil sur les quatre périodes déjà examinées. Ne pas transformer les modes de
 fonctionnement ou les périodes de rapports de maintenance en fausses étiquettes.
 Les règles métier complètes restent dans `AGENTS.md` : aucun contrôle physique,
 aucune procédure technique inventée, aucune performance ML sans mesure et

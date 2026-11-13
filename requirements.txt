@@ -1,11 +1,13 @@
-# Dépendances actives : socle, acquisition et exploration (Python 3.11 ou 3.12).
+# Dépendances : socle, acquisition, exploration et ML (Python 3.11 ou 3.12).
 streamlit>=1.40,<2.0
 pytest>=8.3,<9.0
 pandas>=2.2,<4.0
 numpy>=1.26,<3.0
 plotly>=5.24,<7.0
 requests>=2.32,<3.0
+scikit-learn>=1.5,<2.0
+joblib>=1.4,<2.0
 
-# À ajouter lors des étapes concernées : scikit-learn,
-# sentence-transformers, chromadb, PyMuPDF, langgraph et SDK LLM.
+# À ajouter lors des étapes concernées : sentence-transformers,
+# chromadb, PyMuPDF, langgraph et SDK LLM.
 # SQLite est fourni avec Python (module sqlite3).

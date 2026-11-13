@@ -6,8 +6,8 @@ Prototype académique réalisé par deux étudiants en ingénierie pour analyser
 les données MetroPT-3 d'un compresseur et, à terme, aider à préparer des
 recommandations de maintenance soumises à validation humaine.
 
-Périmètre autorisé : socle, acquisition CSV MetroPT-3, exploration, rapport et
-rejeu chronologique historique. Ne pas implémenter le ML, le RAG, le LLM,
+Périmètre autorisé : socle, acquisition CSV MetroPT-3, exploration, rapport,
+rejeu chronologique et baseline ML Isolation Forest. Ne pas implémenter le RAG, le LLM,
 LangGraph, l'historique métier SQLite ou un plan de maintenance avant les étapes
 correspondantes. SQLite temporaire est autorisé pour vérifier les doublons sur
 disque sans conserver toutes les lignes en mémoire.
@@ -32,8 +32,15 @@ disque sans conserver toutes les lignes en mémoire.
 - Utiliser Python 3.11 ou 3.12 et une architecture modulaire simple.
 - Garder `app.py` comme point d'entrée court ; placer l'interface dans
   `metropt_maintenance/ui.py` et les futurs traitements dans des modules séparés.
-- `ingestion` contient l'acquisition et l'exploration. Les dossiers `ml`, `rag`,
+- `ingestion` contient l'acquisition et l'exploration, `ml` la baseline. Les dossiers `rag`,
   `orchestration`, `maintenance` et `storage` restent réservés.
+- ML : découpage entraînement/calibration/test chronologique ; prétraitement
+  ajusté uniquement sur l'entraînement, seuil uniquement sur la calibration.
+  Toutes les variables temporelles doivent être causales et réinitialisées
+  après un trou de données. Un score n'est pas une probabilité de panne.
+- Les périodes documentées servent uniquement à la comparaison descriptive
+  après entraînement. Les dates non documentées restent non étiquetées : ne pas
+  annoncer précision, F1, ROC-AUC ou taux de faux positifs sans vérité terrain.
 - Utiliser les noms exacts du CSV officiel (notamment `DV_eletric` et `Towers`).
   L'index exporté n'est pas un capteur. Ne créer aucune étiquette de défaillance.
 - Lire les fichiers volumineux par blocs, limiter les points des graphiques et

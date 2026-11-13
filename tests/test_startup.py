@@ -63,3 +63,22 @@ def test_dashboard_reports_invalid_replay_dates(make_csv, tmp_path, monkeypatch)
     _widget(app.button, "Avancer dans le rejeu").click().run()
     assert not app.exception
     assert any("horodatage" in error.value for error in app.error)
+
+
+def test_dashboard_runs_ml_and_shows_scores(ml_measurements, ml_config, tmp_path, monkeypatch):
+    from metropt_maintenance.ml.workflow import run_baseline
+    path = tmp_path / "synthetic_ml.csv"
+    ml_measurements.to_csv(path, index=False)
+    monkeypatch.chdir(tmp_path)
+    def small_baseline(path, **kwargs):
+        return run_baseline(path, config=ml_config, chunksize=100)
+    monkeypatch.setattr("metropt_maintenance.ml.workflow.run_baseline", small_baseline)
+    app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py")).run(timeout=15)
+    _widget(app.text_input, "Chemin du CSV local").set_value(str(path)).run()
+    _widget(app.button, "Entraîner et évaluer Isolation Forest").click().run(timeout=30)
+    assert not app.exception
+    assert app.session_state["ml_result"].metrics["total_observed_windows"] == 180
+    assert len(app.get("plotly_chart")) == 1
+    _widget(app.text_input, "Fin de l'entraînement ML (exclusive pour les mesures brutes)").set_value("invalid").run()
+    _widget(app.button, "Entraîner et évaluer Isolation Forest").click().run()
+    assert not app.exception and len(app.error) > 0

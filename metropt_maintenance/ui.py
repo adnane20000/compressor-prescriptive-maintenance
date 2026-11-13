@@ -11,6 +11,48 @@ from .ingestion.report import aggregate_charts, build_figures, write_report
 from .ingestion.schema import CSV_NAME, PLOT_COLUMNS
 
 
+def _ml_panel(path: Path, identity: tuple | None) -> None:
+    """Exécuter la baseline explicitement et afficher uniquement les résultats réduits."""
+    from .ml.model import ModelConfig
+    from .ml.report import score_figure
+    from .ml.workflow import run_baseline
+
+    st.subheader("Détection d'anomalies — baseline Isolation Forest")
+    st.caption(
+        "Fenêtres historiques d'une minute et variables causales. Le score mesure "
+        "l'atypie statistique, jamais une probabilité de panne ou une cause. "
+        "Le préfixe d'exploration ne limite pas l'entraînement ML."
+    )
+    train_end = st.text_input("Fin de l'entraînement ML (exclusive pour les mesures brutes)", value="2020-02-22 00:00:00")
+    calibration_end = st.text_input("Fin de la calibration ML (exclusive pour les mesures brutes)", value="2020-03-01 00:00:00")
+    ml_identity = (identity, train_end, calibration_end)
+    if st.session_state.get("ml_identity") != ml_identity:
+        st.session_state.pop("ml_result", None)
+    if st.button("Entraîner et évaluer Isolation Forest", disabled=identity is None):
+        try:
+            config = ModelConfig(train_end=train_end, calibration_end=calibration_end)
+            with st.spinner("Prétraitement causal, entraînement, calibration et test…"):
+                result = run_baseline(path, config=config)
+            st.session_state.ml_result = result
+            st.session_state.ml_identity = ml_identity
+        except (OSError, ValueError) as error:
+            st.error(str(error))
+    if "ml_result" in st.session_state:
+        result = st.session_state.ml_result
+        metrics = result.metrics
+        st.write(f"Seuil de calibration : {metrics['threshold']:.6f} ; modèle {metrics['model_id']}.")
+        st.dataframe(pd.DataFrame(metrics["by_split"]), hide_index=True)
+        st.dataframe(pd.DataFrame(metrics["by_mode"]), hide_index=True)
+        test = next(entry for entry in metrics["by_split"] if entry["split"] == "test")
+        st.write(f"Test : {test['alert_windows']:,} alertes sur {test['scored_windows']:,} fenêtres scorées.")
+        st.caption(metrics["limitations"])
+        comparisons = pd.DataFrame(metrics["documented_period_comparisons"])
+        st.dataframe(comparisons, hide_index=True)
+        hourly = pd.read_csv(result.report_path.with_name("score_plot_data.csv"), parse_dates=["timestamp"])
+        st.plotly_chart(score_figure(hourly, metrics["threshold"], metrics["protocol"]), use_container_width=True)
+        st.download_button("Télécharger le rapport ML", result.report_path.read_bytes(), file_name="metropt3_ml.html", mime="text/html")
+
+
 def _clear_replay() -> None:
     """Fermer le lecteur CSV lorsqu'une session de rejeu est réinitialisée."""
     iterator = st.session_state.pop("replay_iterator", None)
@@ -115,4 +157,5 @@ def main() -> None:
             st.plotly_chart(figure, use_container_width=True)
         st.caption(profile["mode_rules"])
         st.download_button("Télécharger le rapport HTML", Path(report_path).read_bytes(), file_name="metropt3_exploration.html", mime="text/html")
+    _ml_panel(path, identity)
     _replay_panel(path, identity)
