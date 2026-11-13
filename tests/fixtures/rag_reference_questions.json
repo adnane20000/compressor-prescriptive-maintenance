@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "scope": "Corpus étendu : références générales fournies, aucune procédure spécifique MetroPT-3. Pages annotées avant recherche.",
+  "cases": [
+    {
+      "question": "According to NASA, what is the purpose of Failure Modes and Effects Analysis (FMEA)?",
+      "should_abstain": false,
+      "expected_references": [
+        {
+          "file": "nasa-rcmguide.pdf",
+          "page": 39
+        },
+        {
+          "file": "nasa-rcmguide.pdf",
+          "page": 40
+        }
+      ]
+    },
+    {
+      "question": "According to the NASA guide, what does lubricant and wear particle analysis determine?",
+      "should_abstain": false,
+      "expected_references": [
+        {
+          "file": "nasa-rcmguide.pdf",
+          "page": 94
+        },
+        {
+          "file": "nasa-rcmguide.pdf",
+          "page": 95
+        }
+      ]
+    },
+    {
+      "question": "How are compressed air leaks detected with an ultrasonic acoustic detector in the DOE sourcebook?",
+      "should_abstain": false,
+      "expected_references": [
+        {
+          "file": "compressed_air_sourcebook.pdf",
+          "page": 32
+        },
+        {
+          "file": "compressed_air_sourcebook.pdf",
+          "page": 33
+        }
+      ]
+    },
+    {
+      "question": "Selon le guide KAESER, pourquoi sécher l'air comprimé ?",
+      "should_abstain": false,
+      "expected_references": [
+        {
+          "file": "P-2010-FR-7-23_23-4888.pdf",
+          "page": 6
+        }
+      ]
+    },
+    {
+      "question": "Selon le guide KAESER, d'où proviennent les condensats dans l'air comprimé ?",
+      "should_abstain": false,
+      "expected_references": [
+        {
+          "file": "P-2010-FR-7-23_23-4888.pdf",
+          "page": 7
+        },
+        {
+          "file": "P-2010-FR-7-23_23-4888.pdf",
+          "page": 8
+        }
+      ]
+    },
+    {
+      "question": "How does a refrigerant dryer remove water from compressed air in the Atlas Copco manual?",
+      "should_abstain": false,
+      "expected_references": [
+        {
+          "file": "The Compressed Air Manual - Ed. 9.pdf",
+          "page": 48
+        }
+      ]
+    },
+    {
+      "question": "What is the working principle of adsorption drying in the Atlas Copco manual?",
+      "should_abstain": false,
+      "expected_references": [
+        {
+          "file": "The Compressed Air Manual - Ed. 9.pdf",
+          "page": 49
+        },
+        {
+          "file": "The Compressed Air Manual - Ed. 9.pdf",
+          "page": 50
+        }
+      ]
+    },
+    {
+      "question": "Quel est le couple de serrage exact de la culasse du compresseur MetroPT-3 ?",
+      "should_abstain": true
+    },
+    {
+      "question": "Quelle procédure de consignation est spécifiquement validée pour le compresseur MetroPT-3 ?",
+      "should_abstain": true
+    },
+    {
+      "question": "Quelle est la recette d'un gâteau au chocolat ?",
+      "should_abstain": true
+    }
+  ]
+}

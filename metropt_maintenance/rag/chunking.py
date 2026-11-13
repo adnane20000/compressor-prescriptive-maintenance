@@ -20,6 +20,7 @@ def chunk_page(page: PDFPage, *, chunk_chars: int = 900, overlap_chars: int = 15
     if chunk_chars < 100 or not 0 <= overlap_chars < chunk_chars // 2:
         raise ValueError("chunk_chars >= 100 et 0 <= overlap < la moitié de chunk_chars requis.")
     text, start, chunks = page.text, 0, []
+    seen_spans = set()
     while start < len(text):
         end = min(len(text), start + chunk_chars)
         if end < len(text):
@@ -30,7 +31,12 @@ def chunk_page(page: PDFPage, *, chunk_chars: int = 900, overlap_chars: int = 15
         actual_start = start + len(raw) - len(raw.lstrip())
         actual_end = end - (len(raw) - len(raw.rstrip()))
         content = text[actual_start:actual_end]
-        if content:
+        # Une étiquette entourée de grands blancs peut apparaître à l'identique
+        # dans plusieurs fenêtres après strip(). Ne pas indexer deux fois le
+        # même intervalle source ; des textes identiques à d'autres offsets restent distincts.
+        span = (actual_start, actual_end)
+        if content and span not in seen_spans:
+            seen_spans.add(span)
             metadata = {**page.metadata, "page": page.page, "page_label": page.page_label,
                         "start_char": actual_start, "end_char": actual_end, "chunk_version": CHUNK_VERSION,
                         "text_is_untrusted_data": True}

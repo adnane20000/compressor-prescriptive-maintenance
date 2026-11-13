@@ -46,6 +46,10 @@ disque sans conserver toutes les lignes en mémoire.
   garde-fous de recherche. Une similarité ne garantit pas une réponse complète.
 - Une description de dataset ou une note pédagogique ne valide aucune procédure
   de maintenance, de sécurité ou limite constructeur. Signaler l'absence de manuel.
+- Distinguer provenance et applicabilité : les guides généraux NASA, DOE, KAESER
+  et Atlas Copco ne sont pas des notices identifiées du compresseur MetroPT-3.
+  Conserver applicability et equipment_reference dans les passages ; ne pas
+  valider une procédure propre à MetroPT à partir d'une référence générale.
 - ML : découpage entraînement/calibration/test chronologique ; prétraitement
   ajusté uniquement sur l'entraînement, seuil uniquement sur la calibration.
   Toutes les variables temporelles doivent être causales et réinitialisées

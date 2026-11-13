@@ -7,12 +7,14 @@ passages, les encode avec Sentence Transformers et les stocke dans ChromaDB.
 `search_documents(question)` retourne les passages et leurs références.
 Il n'y a ni génération LLM, ni agent autonome, ni diagnostic ou procédure inventée.
 
-Le seul document réel disponible pour cette validation est
+Le seul document réel disponible pour la validation initiale présentée ici était
 `Data Description_Metro.pdf`, distribué dans
 [l'archive UCI MetroPT-3](https://archive.ics.uci.edu/dataset/791/metropt+3+).
 Il a été copié localement dans `documents/`, sans être publié dans Git.
-Il décrit le dataset : **ce n'est pas un manuel constructeur**. Aucun manuel,
-guide de maintenance, AMDEC ou document de consignation réel n'a été fourni.
+Il décrit le dataset : **ce n'est pas un manuel constructeur**. Depuis, quatre
+ouvrages généraux ont été importés ; leur provenance, leur portée et leurs tests
+sont décrits dans `docs/rag_corpus_import.md`. Cette section conserve les mesures
+historiques sur le seul PDF UCI, sans les extrapoler au corpus étendu.
 
 Empreinte du PDF :
 
@@ -28,6 +30,8 @@ Le registre `documents/sources.json` classe chaque PDF avec :
 - `document_type` : description de dataset, manuel constructeur, guide de
   maintenance, AMDEC (`fmea`), procédure de sécurité, note pédagogique ou autre ;
 - SHA-256 réel, titre, éditeur et URL de provenance lorsqu'ils sont connus.
+- `applicability` : portée générale, spécifique à un équipement ou non vérifiée ;
+  `equipment_reference` est obligatoire pour une source propre à un équipement.
 
 Une source déclarée officielle exige une URL, un éditeur et une empreinte
 concordante. C'est une déclaration humaine, jamais une certification automatique
@@ -132,11 +136,11 @@ reste inerte et ne peut pas se promouvoir comme source officielle.
 
 ## Résultats effectivement mesurés
 
-Index réel : **1 PDF officiel de description de dataset, 3 pages, 9 passages**.
+Index initial isolé : **1 PDF officiel de description de dataset, 3 pages, 9 passages**.
 Les paramètres et résultats exacts figurent dans `docs/rag_quality_metrics.json`.
 
 ```bash
-python -m metropt_maintenance.rag evaluate tests/fixtures/rag_uci_questions.json
+python -m metropt_maintenance.rag evaluate tests/fixtures/rag_uci_questions.json --index data/local/rag_uci_reference
 ```
 
 Le jeu a été annoté manuellement en vérifiant les pages du PDF : quatre questions
@@ -177,6 +181,6 @@ ne sont pas présentées comme une mesure des embeddings E5.
 
 L'évaluation E5 ci-dessus a été exécutée séparément sur le vrai PDF UCI.
 Les versions des bibliothèques et la révision du modèle sont enregistrées dans
-ses métriques. Ajouter ensuite les documents techniques autorisés dans
-`documents/`, renseigner leur provenance réelle, puis réindexer et étendre les
-questions annotées. Aucun agent autonome n'est ajouté à cette étape.
+ses métriques. Le corpus étendu et son benchmark sont désormais décrits dans
+`docs/rag_corpus_import.md`. Les documents généraux ne prouvent aucune procédure
+spécifique à MetroPT-3. Aucun agent autonome n'est ajouté à cette étape.

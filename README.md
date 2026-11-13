@@ -324,19 +324,28 @@ retrouvés, pas réponse complète certifiée ; `generated_answer` reste nul et
 `sufficiency_verified` reste faux. Certains refus peuvent être trop conservateurs.
 Les instructions, liens et scripts des PDF ne sont jamais exécutés.
 
-**Corpus actuellement vérifié :** uniquement le PDF officiel UCI décrivant le
-dataset, 3 pages et 9 passages. Aucun manuel constructeur, AMDEC ou procédure
-de sécurité n'a été fourni. La recherche ne peut donc pas établir de procédure
-technique applicable au compresseur.
+**Corpus local étendu :** description UCI, guide NASA RCM, sourcebook DOE,
+guide KAESER en français et Compressed Air Manual Atlas Copco, 9e édition.
+Les quatre nouveaux ouvrages sont des références générales ; aucune notice
+spécifique au compresseur MetroPT-3 n'a été identifiée. Le fichier KAESER reste
+non vérifié faute de copie officielle exacte confirmée. Pour Atlas Copco, une
+copie de la même édition a été obtenue sur le site de l'éditeur, la pièce jointe
+dépassant la limite de transfert ; son identité binaire avec l'original n'est
+pas vérifiable. Les détails figurent dans `docs/rag_corpus_import.md`.
+
+La provenance est distincte de l'applicabilité : `general_reference` ne signifie
+pas procédure validée pour MetroPT-3. Une demande opérationnelle explicitement
+liée à MetroPT exige une source spécifique liée à cet équipement ; sinon le
+message reste « information insuffisante », avec éventuellement du contexte cité.
 
 Les tests ordinaires utilisent de petits PDF et un encodeur **synthétiques**,
-sans téléchargement. Une évaluation séparée avec les vrais embeddings E5 a été
-exécutée sur le PDF UCI : 4 questions documentées sur 4 retrouvent la page attendue
-au premier rang, et 3 questions hors corpus sur 3 produisent une abstention.
-Ce petit test ne mesure pas la qualité sur des manuels absents.
+sans téléchargement. L'évaluation initiale avec les vrais embeddings E5 sur le
+seul PDF UCI a retrouvé la page attendue au premier rang pour 4 questions sur 4,
+avec 3 abstentions sur 3 demandes non couvertes. Ces résultats historiques ne
+sont pas extrapolés au corpus étendu.
 
 ```bash
-python -m metropt_maintenance.rag evaluate tests/fixtures/rag_uci_questions.json
+python -m metropt_maintenance.rag evaluate tests/fixtures/rag_reference_questions.json
 ```
 
 Protocole et limites : `docs/rag_retrieval.md`. Résultats mesurés :

@@ -43,6 +43,39 @@ def test_official_dataset_description_cannot_authorize_a_procedure(rag_index):
     assert result.related_passages and result.related_passages[0].document_type == "dataset_description"
 
 
+def test_generic_manual_is_not_a_metropt_specific_procedure(rag_index):
+    directory, index, encoder = rag_index
+    registry = json.loads((directory / "sources.json").read_text())
+    entry = registry["documents"]["description_test.pdf"]
+    entry.update(document_type="manufacturer_manual", applicability="general_reference")
+    (directory / "sources.json").write_text(json.dumps(registry))
+    index_documents(directory, index_directory=index, encoder=encoder)
+    result = search_documents("Quelle procedure concernant Motor_current sur MetroPT-3 ?", index_directory=index, encoder=encoder)
+    assert result.message == "information insuffisante" and result.reason == "equipment_specific_source_missing"
+    assert result.related_passages[0].applicability == "general_reference"
+    assert any("MetroPT-3" in warning for warning in result.warnings)
+
+
+def test_source_filters_do_not_invent_missing_publisher(rag_index):
+    _, index, encoder = rag_index
+    result = search_documents("Selon le guide NASA, que signifie AMDEC ?", index_directory=index, encoder=encoder)
+    assert result.reason == "requested_source_missing" and not result.passages
+
+
+def test_navigation_and_generic_english_words_are_not_evidence(tmp_path, rag_encoder):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    with pymupdf.open() as pdf:
+        pdf.new_page().insert_text((40, 50), "AMDEC ....................... 12")
+        pdf.new_page().insert_text((40, 50), "In this manual a general introduction is presented.")
+        pdf.save(docs / "synthetic.pdf")
+    index = tmp_path / "index"
+    index_documents(docs, index_directory=index, encoder=rag_encoder)
+    assert search_documents("AMDEC", index_directory=index, encoder=rag_encoder).message == "information insuffisante"
+    question = "How does a refrigerant dryer remove water from compressed air in the manual?"
+    assert search_documents(question, index_directory=index, encoder=rag_encoder).message == "information insuffisante"
+
+
 @pytest.mark.parametrize("question", ["Quelle est la recette du gateau au chocolat ?", "Quel couple de serrage pour la culasse ?", "Quelle est la procedure de maintenance ?"])
 def test_unsupported_queries_abstain(rag_index, question):
     _, index, encoder = rag_index

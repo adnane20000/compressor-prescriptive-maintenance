@@ -67,16 +67,20 @@ def _rag_panel() -> None:
             "no_extractable_text": "Aucun texte exploitable : vérifier les PDF et les éventuels besoins d'OCR.",
             "corpus_changed_reindex_required": "Les PDF ou leur provenance ont changé : réindexer les documents.",
             "question_without_searchable_terms": "Préciser la question avec le sujet recherché.",
+            "requested_source_missing": "L'éditeur demandé n'est pas présent dans le corpus déclaré.",
             "operational_source_missing": "Aucune source technique officielle adaptée à cette demande opérationnelle.",
+            "equipment_specific_source_missing": "Aucune source liée au compresseur MetroPT-3 pour cette demande ; les ouvrages généraux ne suffisent pas.",
             "no_relevant_passage": "Aucun passage ne satisfait les critères de recherche.",
             "retrieval_only": "Vérifier les extraits dans leur document d'origine ; leur suffisance n'est pas certifiée.",
         }
         st.caption(explanations[result.reason])
+        for warning in result.warnings:
+            st.text(warning)
         for group, passages in (("Passages retrouvés", result.passages), ("Contexte associé — insuffisant pour cette demande", result.related_passages)):
             if passages:
                 st.write(group)
             for hit in passages:
-                st.text(f"{hit.reference} | {hit.authority} | {hit.document_type} | similarité {hit.similarity:.3f}")
+                st.text(f"{hit.reference} | {hit.authority} | {hit.document_type} | {hit.applicability} | similarité {hit.similarity:.3f}")
                 st.text(hit.text)
                 st.caption(f"Provenance déclarée : {hit.publisher or 'non fournie'} ; empreinte {hit.pdf_sha256}.")
         if result.reason == "corpus_changed_reindex_required":

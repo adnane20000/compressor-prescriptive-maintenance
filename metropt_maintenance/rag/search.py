@@ -13,11 +13,17 @@ from .embeddings import default_encoder
 from .index import INDEX_VERSION, chroma_client, read_manifest, registry_hash
 
 STOPWORDS = set("a au aux avec ce ces cet cette comme comment dans de des du en est et etre font for from how il ils is la le les leur leurs lui ne nous on ou par pas pour que quel quelle quelles quels qui se selon sont sur the to un une units what when where which pourquoi pouvez donner donne veuillez please does do are can could would expliquer explique signifie definition document documents pdf page pages".split())
+STOPWORDS.update("in of by at an it its as about into with be been being this that these those their them our your we you they than then through".split())
 SYNONYMS = {"huile": "oil", "courant": "current", "moteur": "motor", "pression": "pressure",
             "compresseur": "compressor", "unite": "unit", "unites": "unit", "units": "unit",
             "temperatures": "temperature", "oil_temperature": "temperature", "capteur": "sensor",
             "capteurs": "sensor", "reservoir": "reservoirs", "donnees": "data", "collecte": "collected",
             "collectees": "collected"}
+SYNONYMS.update({"secher": "dry", "sechage": "dry", "drying": "dry", "dryer": "dry", "dryers": "dry",
+                 "condensats": "condensate", "condensates": "condensate", "fuites": "leak", "leaks": "leak"})
+TOPIC_STOPWORDS = set("guide manuel manual sourcebook air compressed comprime compressor compresseurs system systeme nasa doe atlas copco kaeser according".split())
+SOURCE_ALIASES = {"nasa": ("nasa", "aeronautics"), "doe": ("department of energy",),
+                  "kaeser": ("kaeser",), "atlas": ("atlas copco",), "copco": ("atlas copco",)}
 OPERATIONAL_TERMS = set("procedure procedures securite safety urgence emergency consignation lockout serrage torque couple demonter demontage reparer reparation repair replacement replace disassemble disconnect debrancher isolate consigner intervention intervenir remplacement remplacer constructeur manufacturer maximale maximal maximum limite autorisee admissible".split())
 CRITICAL_GROUPS = (
     {"serrage", "torque"}, {"consignation", "lockout"}, {"urgence", "emergency"},
@@ -48,6 +54,8 @@ class Passage:
     authority_basis: str
     similarity: float
     matched_query_terms: list[str]
+    applicability: str = "not_verified"
+    equipment_reference: str = ""
     text_is_untrusted_data: bool = True
 
 
@@ -109,11 +117,23 @@ def search_documents(
     if vector.shape != (encoder.signature["dimension"],) or not np.isfinite(vector).all() or np.linalg.norm(vector) == 0:
         raise ValueError("Embedding de question invalide.")
     vector = vector / np.linalg.norm(vector)
-    kwargs = {"where": {"authority": authority}} if authority != "all" else {}
-    candidates = collection.query(query_embeddings=[vector.tolist()], n_results=min(collection.count(), max(20, top_k * 4)),
+    conditions = [{"authority": authority}] if authority != "all" else []
+    requested_sources = terms & SOURCE_ALIASES.keys()
+    if requested_sources:
+        paths = [document["relative_path"] for document in manifest["documents"]
+                 if any(alias in (document["title"] + " " + document["publisher"] + " " + document["relative_path"]).lower()
+                        for source in requested_sources for alias in SOURCE_ALIASES[source])]
+        if not paths:
+            return insufficient(question, "requested_source_missing")
+        conditions.append({"relative_path": {"$in": paths}})
+    kwargs = {"where": conditions[0] if len(conditions) == 1 else {"$and": conditions}} if conditions else {}
+    candidates = collection.query(query_embeddings=[vector.tolist()], n_results=min(collection.count(), max(100, top_k * 20)),
                                   include=["documents", "metadatas", "distances"], **kwargs)
     operational = bool(terms & OPERATIONAL_TERMS)
+    project_specific = operational and any(term.startswith("metropt") for term in terms)
     accepted, related = [], []
+    topics = terms - TOPIC_STOPWORDS
+    seen_pages = set()
     # Seuls les documents de l'inventaire actif peuvent fournir une citation.
     known = {item["relative_path"]: item["sha256"] for item in manifest["inventory"]}
     for text, metadata, distance in zip(candidates["documents"][0], candidates["metadatas"][0], candidates["distances"][0]):
@@ -121,23 +141,35 @@ def search_documents(
         passage_terms = query_terms(text)
         matched = terms & passage_terms
         critical_covered = all(not (terms & group) or bool(passage_terms & group) for group in CRITICAL_GROUPS)
-        if similarity < min_similarity or not matched or not critical_covered:
+        navigation = bool(re.search(r"\.{5,}", text)) and not (terms & {"sommaire", "contents"})
+        if similarity < min_similarity or not matched or not critical_covered or navigation or (topics and not topics.intersection(passage_terms)):
             continue
         if known.get(metadata["relative_path"]) != metadata["pdf_sha256"] or metadata["page"] < 1:
             raise ValueError("Référence hors de l'inventaire actif.")
+        page_key = (metadata["relative_path"], metadata["page"])
+        if page_key in seen_pages:
+            continue
+        seen_pages.add(page_key)
         hit = Passage(
             text=text, reference=f"{metadata['relative_path']}, p. {metadata['page']}",
             file_name=metadata["file_name"], relative_path=metadata["relative_path"], page=metadata["page"],
             page_label=metadata["page_label"], pdf_sha256=metadata["pdf_sha256"], authority=metadata["authority"],
             document_type=metadata["document_type"], publisher=metadata["publisher"], source_url=metadata["source_url"],
             authority_basis=metadata["authority_basis"], similarity=similarity, matched_query_terms=sorted(matched),
+            applicability=metadata.get("applicability", "not_verified"),
+            equipment_reference=metadata.get("equipment_reference", ""),
         )
-        if operational and not (hit.authority == "official" and hit.document_type in OPERATIONAL_TYPES):
+        project_matched = (hit.applicability == "equipment_specific" and
+                           any(term.startswith("metropt") for term in query_terms(hit.equipment_reference)))
+        if (operational and not (hit.authority == "official" and hit.document_type in OPERATIONAL_TYPES)) or (project_specific and not project_matched):
             related.append(hit)
         else:
             accepted.append(hit)
+    warnings = list(manifest["warnings"])
+    if any(hit.applicability != "equipment_specific" for hit in accepted + related):
+        warnings.append("Référence générale ou portée non vérifiée : aucune applicabilité au compresseur MetroPT-3 n'est établie.")
     if not accepted:
-        return insufficient(question, "operational_source_missing" if related else "no_relevant_passage",
-                            warnings=manifest["warnings"], related=related[:top_k])
+        reason = "equipment_specific_source_missing" if project_specific and related else "operational_source_missing" if related else "no_relevant_passage"
+        return insufficient(question, reason, warnings=warnings, related=related[:top_k])
     return SearchResult(question, "passages_found", "Passages retrouvés ; vérifier leur portée et leur applicabilité.",
-                        "retrieval_only", passages=accepted[:top_k], warnings=manifest["warnings"])
+                        "retrieval_only", passages=accepted[:top_k], warnings=warnings)

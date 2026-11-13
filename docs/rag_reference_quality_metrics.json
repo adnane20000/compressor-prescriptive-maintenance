@@ -1,0 +1,406 @@
+{
+  "corpus": {
+    "pdf_count": 5,
+    "page_count": 784,
+    "chunk_count": 4062,
+    "empty_pages": 9,
+    "warnings": [
+      "The Compressed Air Manual - Ed. 9.pdf, p. 2 : page sans texte exploitable ; OCR éventuellement nécessaire.",
+      "The Compressed Air Manual - Ed. 9.pdf, p. 10 : page sans texte exploitable ; OCR éventuellement nécessaire.",
+      "The Compressed Air Manual - Ed. 9.pdf, p. 32 : page sans texte exploitable ; OCR éventuellement nécessaire.",
+      "The Compressed Air Manual - Ed. 9.pdf, p. 104 : page sans texte exploitable ; OCR éventuellement nécessaire.",
+      "The Compressed Air Manual - Ed. 9.pdf, p. 116 : page sans texte exploitable ; OCR éventuellement nécessaire.",
+      "The Compressed Air Manual - Ed. 9.pdf, p. 128 : page sans texte exploitable ; OCR éventuellement nécessaire.",
+      "The Compressed Air Manual - Ed. 9.pdf, p. 146 : page sans texte exploitable ; OCR éventuellement nécessaire.",
+      "The Compressed Air Manual - Ed. 9.pdf, p. 147 : page sans texte exploitable ; OCR éventuellement nécessaire.",
+      "nasa-rcmguide.pdf, p. 2 : page sans texte exploitable ; OCR éventuellement nécessaire."
+    ],
+    "documents": [
+      {
+        "file": "Data Description_Metro.pdf",
+        "pages": 3,
+        "chunks": 9,
+        "authority": "official",
+        "applicability": "general_reference",
+        "sha256": "b00fac0e8899854078309bef4adaa480d82ecf14dc81c5097c3646973e824127"
+      },
+      {
+        "file": "P-2010-FR-7-23_23-4888.pdf",
+        "pages": 33,
+        "chunks": 601,
+        "authority": "unverified",
+        "applicability": "general_reference",
+        "sha256": "ebd0c4d6ddf13cb91793f10a2642b91f30eff20625facb5a49775f02d230d760"
+      },
+      {
+        "file": "The Compressed Air Manual - Ed. 9.pdf",
+        "pages": 148,
+        "chunks": 571,
+        "authority": "official",
+        "applicability": "general_reference",
+        "sha256": "f78767e23750e7bc2e63888bf1075ac9a8bc2f15a2e3c441ac54e67f1f73b931"
+      },
+      {
+        "file": "compressed_air_sourcebook.pdf",
+        "pages": 128,
+        "chunks": 766,
+        "authority": "official",
+        "applicability": "general_reference",
+        "sha256": "deeaf015ddfa026330f3ff9af877395c0b92e095851ed2c585afaf2d36b77e19"
+      },
+      {
+        "file": "nasa-rcmguide.pdf",
+        "pages": 472,
+        "chunks": 2115,
+        "authority": "official",
+        "applicability": "general_reference",
+        "sha256": "2d5752842bccfac479d8bd7e621db0c40701082a6cd4e042c53aabe9166da64b"
+      }
+    ]
+  },
+  "validation": {
+    "question_count": 10,
+    "answerable_count": 7,
+    "unanswerable_count": 3,
+    "hit_at_1": 0.42857142857142855,
+    "hit_at_k": 0.7142857142857143,
+    "mean_reciprocal_rank_at_k": 0.5476190476190477,
+    "unanswerable_abstention_rate": 1.0,
+    "top_k": 3,
+    "min_similarity": 0.8,
+    "cases": [
+      {
+        "question": "According to NASA, what is the purpose of Failure Modes and Effects Analysis (FMEA)?",
+        "should_abstain": false,
+        "expected_references": [
+          {
+            "file": "nasa-rcmguide.pdf",
+            "page": 39
+          },
+          {
+            "file": "nasa-rcmguide.pdf",
+            "page": 40
+          }
+        ],
+        "status": "passages_found",
+        "reason": "retrieval_only",
+        "first_relevant_rank": 2,
+        "returned_references": [
+          {
+            "file": "nasa-rcmguide.pdf",
+            "page": 240,
+            "similarity": 0.9067477583885193,
+            "authority": "official"
+          },
+          {
+            "file": "nasa-rcmguide.pdf",
+            "page": 39,
+            "similarity": 0.8978994488716125,
+            "authority": "official"
+          },
+          {
+            "file": "nasa-rcmguide.pdf",
+            "page": 48,
+            "similarity": 0.8826353549957275,
+            "authority": "official"
+          }
+        ]
+      },
+      {
+        "question": "According to the NASA guide, what does lubricant and wear particle analysis determine?",
+        "should_abstain": false,
+        "expected_references": [
+          {
+            "file": "nasa-rcmguide.pdf",
+            "page": 94
+          },
+          {
+            "file": "nasa-rcmguide.pdf",
+            "page": 95
+          }
+        ],
+        "status": "passages_found",
+        "reason": "retrieval_only",
+        "first_relevant_rank": null,
+        "returned_references": [
+          {
+            "file": "nasa-rcmguide.pdf",
+            "page": 129,
+            "similarity": 0.9126144647598267,
+            "authority": "official"
+          },
+          {
+            "file": "nasa-rcmguide.pdf",
+            "page": 100,
+            "similarity": 0.8873034715652466,
+            "authority": "official"
+          },
+          {
+            "file": "nasa-rcmguide.pdf",
+            "page": 171,
+            "similarity": 0.8722781538963318,
+            "authority": "official"
+          }
+        ]
+      },
+      {
+        "question": "How are compressed air leaks detected with an ultrasonic acoustic detector in the DOE sourcebook?",
+        "should_abstain": false,
+        "expected_references": [
+          {
+            "file": "compressed_air_sourcebook.pdf",
+            "page": 32
+          },
+          {
+            "file": "compressed_air_sourcebook.pdf",
+            "page": 33
+          }
+        ],
+        "status": "passages_found",
+        "reason": "retrieval_only",
+        "first_relevant_rank": 1,
+        "returned_references": [
+          {
+            "file": "compressed_air_sourcebook.pdf",
+            "page": 32,
+            "similarity": 0.8876263499259949,
+            "authority": "official"
+          },
+          {
+            "file": "compressed_air_sourcebook.pdf",
+            "page": 33,
+            "similarity": 0.8764524459838867,
+            "authority": "official"
+          },
+          {
+            "file": "compressed_air_sourcebook.pdf",
+            "page": 65,
+            "similarity": 0.8756768703460693,
+            "authority": "official"
+          }
+        ]
+      },
+      {
+        "question": "Selon le guide KAESER, pourquoi sécher l'air comprimé ?",
+        "should_abstain": false,
+        "expected_references": [
+          {
+            "file": "P-2010-FR-7-23_23-4888.pdf",
+            "page": 6
+          }
+        ],
+        "status": "passages_found",
+        "reason": "retrieval_only",
+        "first_relevant_rank": 3,
+        "returned_references": [
+          {
+            "file": "P-2010-FR-7-23_23-4888.pdf",
+            "page": 4,
+            "similarity": 0.8786221742630005,
+            "authority": "unverified"
+          },
+          {
+            "file": "P-2010-FR-7-23_23-4888.pdf",
+            "page": 7,
+            "similarity": 0.8692333102226257,
+            "authority": "unverified"
+          },
+          {
+            "file": "P-2010-FR-7-23_23-4888.pdf",
+            "page": 6,
+            "similarity": 0.8636858463287354,
+            "authority": "unverified"
+          }
+        ]
+      },
+      {
+        "question": "Selon le guide KAESER, d'où proviennent les condensats dans l'air comprimé ?",
+        "should_abstain": false,
+        "expected_references": [
+          {
+            "file": "P-2010-FR-7-23_23-4888.pdf",
+            "page": 7
+          },
+          {
+            "file": "P-2010-FR-7-23_23-4888.pdf",
+            "page": 8
+          }
+        ],
+        "status": "passages_found",
+        "reason": "retrieval_only",
+        "first_relevant_rank": 1,
+        "returned_references": [
+          {
+            "file": "P-2010-FR-7-23_23-4888.pdf",
+            "page": 7,
+            "similarity": 0.8658744096755981,
+            "authority": "unverified"
+          },
+          {
+            "file": "P-2010-FR-7-23_23-4888.pdf",
+            "page": 16,
+            "similarity": 0.8597457408905029,
+            "authority": "unverified"
+          },
+          {
+            "file": "P-2010-FR-7-23_23-4888.pdf",
+            "page": 17,
+            "similarity": 0.8572587966918945,
+            "authority": "unverified"
+          }
+        ]
+      },
+      {
+        "question": "How does a refrigerant dryer remove water from compressed air in the Atlas Copco manual?",
+        "should_abstain": false,
+        "expected_references": [
+          {
+            "file": "The Compressed Air Manual - Ed. 9.pdf",
+            "page": 48
+          }
+        ],
+        "status": "passages_found",
+        "reason": "retrieval_only",
+        "first_relevant_rank": null,
+        "returned_references": [
+          {
+            "file": "The Compressed Air Manual - Ed. 9.pdf",
+            "page": 51,
+            "similarity": 0.8898283243179321,
+            "authority": "official"
+          },
+          {
+            "file": "The Compressed Air Manual - Ed. 9.pdf",
+            "page": 120,
+            "similarity": 0.8868198394775391,
+            "authority": "official"
+          },
+          {
+            "file": "The Compressed Air Manual - Ed. 9.pdf",
+            "page": 122,
+            "similarity": 0.8793795108795166,
+            "authority": "official"
+          }
+        ]
+      },
+      {
+        "question": "What is the working principle of adsorption drying in the Atlas Copco manual?",
+        "should_abstain": false,
+        "expected_references": [
+          {
+            "file": "The Compressed Air Manual - Ed. 9.pdf",
+            "page": 49
+          },
+          {
+            "file": "The Compressed Air Manual - Ed. 9.pdf",
+            "page": 50
+          }
+        ],
+        "status": "passages_found",
+        "reason": "retrieval_only",
+        "first_relevant_rank": 1,
+        "returned_references": [
+          {
+            "file": "The Compressed Air Manual - Ed. 9.pdf",
+            "page": 49,
+            "similarity": 0.8770644664764404,
+            "authority": "official"
+          },
+          {
+            "file": "The Compressed Air Manual - Ed. 9.pdf",
+            "page": 78,
+            "similarity": 0.8689692616462708,
+            "authority": "official"
+          },
+          {
+            "file": "The Compressed Air Manual - Ed. 9.pdf",
+            "page": 50,
+            "similarity": 0.8542373180389404,
+            "authority": "official"
+          }
+        ]
+      },
+      {
+        "question": "Quel est le couple de serrage exact de la culasse du compresseur MetroPT-3 ?",
+        "should_abstain": true,
+        "expected_references": [],
+        "status": "information_insuffisante",
+        "reason": "no_relevant_passage",
+        "first_relevant_rank": null,
+        "returned_references": []
+      },
+      {
+        "question": "Quelle procédure de consignation est spécifiquement validée pour le compresseur MetroPT-3 ?",
+        "should_abstain": true,
+        "expected_references": [],
+        "status": "information_insuffisante",
+        "reason": "no_relevant_passage",
+        "first_relevant_rank": null,
+        "returned_references": []
+      },
+      {
+        "question": "Quelle est la recette d'un gâteau au chocolat ?",
+        "should_abstain": true,
+        "expected_references": [],
+        "status": "information_insuffisante",
+        "reason": "no_relevant_passage",
+        "first_relevant_rank": null,
+        "returned_references": []
+      }
+    ],
+    "encoder": {
+      "model": "intfloat/multilingual-e5-small",
+      "revision": "614241f622f53c4eeff9890bdc4f31cfecc418b3",
+      "dimension": 384,
+      "normalization": "l2",
+      "prefixes": "query:/passage:-v1",
+      "max_tokens": 512
+    },
+    "corpus_inventory": [
+      {
+        "relative_path": "Data Description_Metro.pdf",
+        "sha256": "b00fac0e8899854078309bef4adaa480d82ecf14dc81c5097c3646973e824127"
+      },
+      {
+        "relative_path": "P-2010-FR-7-23_23-4888.pdf",
+        "sha256": "ebd0c4d6ddf13cb91793f10a2642b91f30eff20625facb5a49775f02d230d760"
+      },
+      {
+        "relative_path": "The Compressed Air Manual - Ed. 9.pdf",
+        "sha256": "f78767e23750e7bc2e63888bf1075ac9a8bc2f15a2e3c441ac54e67f1f73b931"
+      },
+      {
+        "relative_path": "compressed_air_sourcebook.pdf",
+        "sha256": "deeaf015ddfa026330f3ff9af877395c0b92e095851ed2c585afaf2d36b77e19"
+      },
+      {
+        "relative_path": "nasa-rcmguide.pdf",
+        "sha256": "2d5752842bccfac479d8bd7e621db0c40701082a6cd4e042c53aabe9166da64b"
+      }
+    ],
+    "indexed_pages": 784,
+    "indexed_chunks": 4062,
+    "library_versions": {
+      "sentence-transformers": "5.7.0",
+      "chromadb": "1.5.9",
+      "PyMuPDF": "1.28.2",
+      "torch": "2.15.0+cpu"
+    },
+    "relevance_definition": "Correspondance au PDF et à la page annotés ; pas une vérification de réponse complète.",
+    "limits": "Petit jeu annoté : résultats locaux, sans généralisation aux manuels absents ni certification de suffisance.",
+    "scope": "Corpus étendu : références générales fournies, aucune procédure spécifique MetroPT-3. Pages annotées avant recherche.",
+    "evaluation_role": "development_validation_not_independent_test"
+  },
+  "baseline_development_comparison": {
+    "hit_at_1": 0.2857142857142857,
+    "hit_at_k": 0.42857142857142855,
+    "mean_reciprocal_rank_at_k": 0.35714285714285715,
+    "unanswerable_abstention_rate": 1.0
+  },
+  "provenance_notes": {
+    "nasa": "Uploaded copy matches official NASA bytes.",
+    "doe": "Uploaded copy matches official DOE bytes, edition November 2003.",
+    "kaeser": "Publisher identified in upload; exact official copy unconfirmed; authority remains unverified.",
+    "atlas": "Official publisher copy of edition 9 substituted because the uploaded file exceeded the 32 MiB transfer limit. Byte identity with the upload cannot be verified."
+  }
+}

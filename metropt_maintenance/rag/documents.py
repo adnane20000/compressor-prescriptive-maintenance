@@ -11,6 +11,7 @@ import pymupdf
 AUTHORITIES = ("official", "pedagogical", "unverified")
 DOCUMENT_TYPES = ("dataset_description", "manufacturer_manual", "maintenance_guide", "fmea", "safety_procedure", "educational_note", "other")
 OPERATIONAL_TYPES = ("manufacturer_manual", "maintenance_guide", "fmea", "safety_procedure")
+APPLICABILITIES = ("not_verified", "general_reference", "equipment_specific")
 
 
 def file_sha256(path: str | Path) -> str:
@@ -50,6 +51,10 @@ def load_registry(directory: str | Path) -> dict:
             raise ValueError("Chemin ou entrée invalide dans le registre.")
         if entry.get("authority") not in AUTHORITIES or entry.get("document_type") not in DOCUMENT_TYPES:
             raise ValueError(f"Statut ou type documentaire invalide : {relative}")
+        if entry.get("applicability", "not_verified") not in APPLICABILITIES:
+            raise ValueError(f"Portée documentaire invalide : {relative}")
+        if entry.get("applicability") == "equipment_specific" and not entry.get("equipment_reference"):
+            raise ValueError(f"Une source propre à un équipement exige sa référence : {relative}")
         digest = entry.get("sha256", "")
         if not isinstance(digest, str) or len(digest) != 64 or any(character not in "0123456789abcdef" for character in digest):
             raise ValueError(f"Empreinte SHA-256 invalide : {relative}")
@@ -65,14 +70,15 @@ def document_metadata(item: dict, registry: dict) -> dict:
     relative = item["relative_path"]
     metadata = {"file_name": Path(relative).name, "relative_path": relative, "pdf_sha256": item["sha256"],
                 "authority": "unverified", "document_type": "other", "publisher": "", "source_url": "",
-                "title": Path(relative).name, "authority_basis": "not_declared"}
+                "title": Path(relative).name, "authority_basis": "not_declared",
+                "applicability": "not_verified", "equipment_reference": ""}
     declaration = registry.get(relative)
     if declaration is not None:
         if declaration["sha256"] != item["sha256"]:
             metadata["authority_basis"] = "checksum_mismatch"
         else:
             metadata.update({name: str(declaration.get(name, metadata[name])) for name in
-                             ("authority", "document_type", "publisher", "source_url", "title")})
+                             ("authority", "document_type", "publisher", "source_url", "title", "applicability", "equipment_reference")})
             metadata["authority_basis"] = "human_registry_matched_sha256"
     return metadata
 

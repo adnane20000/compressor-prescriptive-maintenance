@@ -14,7 +14,13 @@ ne peut pas se déclarer lui-même officiel. Sans déclaration valide, le PDF re
 
 Le PDF UCI `Data Description_Metro.pdf`, lorsqu'il est disponible localement,
 décrit le dataset. Il n'est ni un manuel constructeur, ni une AMDEC, ni une
-procédure de sécurité. Aucun document technique de ces types n'est fourni ici.
+procédure de sécurité. Le corpus local contient aussi les guides généraux NASA,
+DOE, KAESER et Atlas Copco fournis ou acquis pour le projet. Aucun n'est une
+notice identifiée du compresseur MetroPT-3. Voir `docs/rag_corpus_import.md`.
+
+Le champ `applicability` distingue `general_reference`, `equipment_specific`
+et `not_verified`. Une source spécifique doit renseigner `equipment_reference`.
+Le statut officiel d'un éditeur ne prouve pas l'applicabilité à votre équipement.
 
 Les pages scannées sans texte nécessitent un OCR externe et une vérification
 humaine ; ce module n'effectue pas d'OCR. Les tableaux, dessins, colonnes et textes

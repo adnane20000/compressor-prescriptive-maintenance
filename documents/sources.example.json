@@ -4,6 +4,8 @@
     "REMPLACER_PAR_LE_VRAI_NOM.pdf": {
       "authority": "unverified",
       "document_type": "other",
+      "applicability": "not_verified",
+      "equipment_reference": "",
       "sha256": "REMPLACER_PAR_LE_SHA256_REEL_DU_PDF",
       "title": "REMPLACER_PAR_LE_TITRE_REEL",
       "publisher": "",

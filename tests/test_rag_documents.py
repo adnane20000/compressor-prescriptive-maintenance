@@ -37,6 +37,14 @@ def test_chunking_keeps_overlap_content_and_stable_identifiers():
         chunk_page(page, chunk_chars=100, overlap_chars=80)
 
 
+def test_large_layout_whitespace_does_not_duplicate_source_spans():
+    page = PDFPage(" " * 800 + "marker" + " " * 1800, 4, "", {"relative_path": "layout.pdf", "pdf_sha256": "test"})
+    chunks = chunk_page(page)
+    assert len(chunks) == 1 and chunks[0].text == "marker"
+    assert len({chunk.identifier for chunk in chunks}) == len(chunks)
+    assert page.text[chunks[0].metadata["start_char"]:chunks[0].metadata["end_char"]] == "marker"
+
+
 def test_unknown_pdf_cannot_self_declare_official(rag_corpus):
     directory, _ = rag_corpus
     item = next(item for item in pdf_inventory(directory) if item["relative_path"] == "untrusted_test.pdf")
