@@ -190,7 +190,11 @@ une deuxième fois via l'API de revue.
 
 ## Vérifications exécutées
 
-`python -m pytest` : **224 tests réussis**, dont **57 tests d'orchestration,
+Le parcours actuel en cinq pages, la liste des dossiers persistants et les
+vérifications d'interface sont décrits dans `docs/interface_streamlit.md`.
+
+À la livraison initiale du workflow et de la supervision, `python -m pytest` :
+**224 tests réussis**, dont **57 tests d'orchestration,
 proposition et persistance**. Ils vérifient les branches normales et anormales,
 les sources absentes, refus à risque, erreurs ML/RAG/API et réponses invalides,
 la revue obligatoire, les soumissions invalides, la réouverture du checkpointer,

@@ -117,3 +117,11 @@ class DecisionStore:
                                (record.run_id, json.dumps(data, ensure_ascii=False, allow_nan=False), record.outcome,
                                 record.recorded_at_utc, record.validator_id, record.comments))
         return data
+
+    def list_records(self, *, limit=100, offset=0) -> list[dict]:
+        """Historique paginé ; chaque reçu est revalidé avant affichage."""
+        if not 1 <= limit <= 200 or offset < 0:
+            raise ValueError("Pagination des décisions invalide.")
+        with self._connect() as connection:
+            ids = [row[0] for row in connection.execute("SELECT run_id FROM workflow_decisions ORDER BY decided_at_utc DESC, run_id LIMIT ? OFFSET ?", (limit,offset))]
+        return [self.get(run_id) for run_id in ids]

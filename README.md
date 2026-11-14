@@ -1,4 +1,4 @@
-# MetroPT — anomalies ML, recherche documentaire et diagnostic préliminaire
+# MetroPT — application de maintenance prescriptive
 
 Prototype académique de maintenance prescriptive du compresseur MetroPT-3.
 Le projet implémente l'acquisition CSV, l'exploration, les rapports avec graphiques,
@@ -8,6 +8,35 @@ un workflow LangGraph avec checkpoints, revue humaine et décisions locales.
 Le mode mock fonctionne sans clé API et s'affiche comme une simulation.
 Les propositions préparent une revue documentaire avant intervention ; aucune
 procédure physique n'est créée sans documents applicables à l'équipement.
+
+## Interface en cinq pages
+
+La navigation latérale donne accès à cinq vues, avec un thème commun Streamlit
+et des graphiques Plotly interactifs. Les citations conservent le texte original
+des PDF ; les libellés et formats d'affichage sont en français.
+
+| Page | Contenu |
+| --- | --- |
+| Dashboard | État interprété, température d'huile, pressions TP2/TP3, courant moteur, modes et rejeu pas à pas |
+| Détection d'anomalies | Scores, seuil de calibration, fenêtres contenant des alertes, historique paginé et protocole |
+| Assistant RAG | Questions, citations vérifiées sélectionnées par le fournisseur, sources et pages |
+| Diagnostic agentique | Étapes LangGraph, faits, hypothèses non confirmées, justifications et proposition documentaire |
+| Gestion des interventions | Dossiers en attente, fiche de revue, approbations/refus/révisions et historique SQLite |
+
+Le mode **Démonstration sans API** est sélectionné par défaut et impose le mock
+dans l'interface. Les mesures historiques restent réelles si elles viennent du
+CSV réel : une sortie LLM simulée ne change pas leur nature. Le bouton **Créer
+un exemple synthétique**, dans **Source des mesures**, crée 721 mesures
+pédagogiques explicitement signalées, sans étiquette de panne ni performance ML.
+
+Les résultats ML enregistrés affichent leur propre provenance, indépendamment
+du CSV choisi pour le rejeu. Les fichiers absents produisent des états vides.
+Aucun entraînement, indexation ou appel LLM n'est lancé à l'ouverture d'une page.
+L'aperçu lit au plus 360 mesures ; le rejeu en conserve 1 000, les scores sont
+réduits à 1 600 points et l'historique affiche 50 alertes par page. Les dossiers
+et décisions sont limités aux 100 plus récents dans les vues de gestion.
+
+Guide de démonstration et vérifications : `docs/interface_streamlit.md`.
 
 ## Installer et lancer
 
@@ -269,8 +298,10 @@ résultats réels figure dans `docs/ml_baseline_metrics.json`.
 
 ## Recherche documentaire RAG
 
-Cette étape retrouve des extraits de PDF, avec leur fichier et leur page.
-Elle ne génère pas de réponse LLM et n'ajoute aucun agent autonome.
+`search_documents()` retrouve des extraits de PDF, avec leur fichier et leur page,
+sans génération LLM. La page **Assistant RAG** utilise ensuite
+`generate_document_answer()` : le fournisseur sélectionne des citations,
+revérifiées dans les PDF, sans procédure technique libre ni agent autonome.
 
 1. Déposer les PDF autorisés dans `documents/`.
 2. Facultativement créer `documents/sources.json` à partir de l'exemple fourni,
@@ -291,7 +322,7 @@ fonctionnent sans clé API et hors ligne. Les textes des PDF ne sont pas envoyé
 un service d'embeddings. Les commandes `index`, `search` et `evaluate` acceptent
 `--cache` si un autre dossier de poids a été utilisé pour `prepare-model`.
 
-Le dashboard propose **Indexer les PDF**, un filtre officiel/pédagogique/non
+La page Assistant RAG propose **Indexer les PDF**, un filtre officiel/pédagogique/non
 vérifié et un champ **Question documentaire**. Aucun index ni modèle lourd n'est
 chargé au simple démarrage. Sans index ou sans résultat pertinent, la réponse est
 **« information insuffisante »**.
@@ -377,7 +408,8 @@ export LLM_PROVIDER=mock
 python -m streamlit run app.py --browser.gatherUsageStats=false
 ```
 
-Dans le dashboard, effectuer une recherche documentaire, charger la première
+Dans **Assistant RAG**, effectuer une recherche documentaire. Dans **Diagnostic
+agentique**, ouvrir la section de diagnostic manuel, charger la première
 alerte ML disponible ou saisir un événement JSON, puis cliquer sur
 **Générer le diagnostic préliminaire**. Le fichier d'alertes est lu une ligne à
 la fois. Les passages de la dernière recherche sont revérifiés dans les PDF.
@@ -435,10 +467,11 @@ Contrat, états d'erreur et limites : `docs/diagnostic_preliminaire.md`.
 
 ## Workflow LangGraph et revue humaine
 
-Après mise à jour des dépendances, utiliser la section **Workflow LangGraph** du
-dashboard. Elle réutilise le CSV local et le modèle entraîné, puis le RAG et le
+Après mise à jour des dépendances, ouvrir **Diagnostic agentique**.
+Cette page réutilise le CSV local et le modèle entraîné, puis le RAG et le
 diagnostic configurés. Aucun entraînement ni recalibrage n'est effectué pendant
-le workflow. Les chemins RAG du workflow sont `documents/` et `data/local/rag/`.
+le workflow. Les chemins RAG par défaut sont `documents/` et `data/local/rag/` ;
+les paramètres choisis dans **Assistant RAG** sont partagés avec le workflow.
 
 ```bash
 python -m pip install -r requirements.txt
@@ -519,7 +552,7 @@ Le journal utilise des dates UTC explicites ; le fuseau des mesures MetroPT rest
 non documenté. Aucun client ou secret LLM n'est stocké dans les checkpoints et
 le traçage distant LangSmith est désactivé dans l'API du workflow.
 
-**Validation exécutée : 224 tests réussis**, dont 57 tests du workflow et de sa
+**Validation exécutée : 245 tests réussis**, dont 58 tests du workflow et de sa
 persistance. Un essai distinct sur 45 mesures réelles a retrouvé l'anomalie de la
 minute close à 04:15 le 1er mars 2020, puis les passages DOE. Le diagnostic mock
 a été conservé et le checkpoint rouvert ; le dossier reste **en attente**, sans
@@ -532,7 +565,8 @@ La supervision et ses états sont décrits dans `docs/human_supervision.md`.
 ```text
 app.py                          point d'entrée Streamlit
 metropt_maintenance/
-  ui.py                         exploration locale et commandes de rejeu
+  ui.py                         cinq pages, navigation et fiche de revue
+  presentation.py               lectures bornées, démonstration et graphiques Plotly
   ingestion/
     schema.py                   dictionnaire des 15 signaux et unités
     acquisition.py              téléchargement officiel en flux
@@ -555,6 +589,7 @@ metropt_maintenance/
     embeddings.py               Sentence Transformers local, révision fixée
     index.py                    ChromaDB et remplacement de l'index actif
     search.py                   search_documents et abstention
+    answer.py                   sélection de citations et réponse sourcée validée
     safety.py                   refus heuristique de demandes explicites à risque
     evaluation.py               qualité sur questions et pages annotées
     __main__.py                 préparation, indexation, recherche, évaluation

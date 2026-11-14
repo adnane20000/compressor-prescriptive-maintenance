@@ -340,13 +340,16 @@ def test_streamlit_requires_manual_review_and_reopens_saved_thread(workflow_serv
     app = AppTest.from_file(app_path).run(timeout=15)
     def widget(widgets, label): return next(item for item in widgets if item.label == label)
     widget(app.text_input, "Chemin du CSV local").set_value(str(path)).run()
+    widget(app.selectbox, "Origine déclarée des mesures").select("Synthétique (test)").run()
+    widget(app.radio, "Navigation").set_value("Diagnostic agentique").run()
     widget(app.text_input, "Début du contexte du workflow").set_value("2020-02-01 02:54:00").run()
     widget(app.text_input, "Fin des mesures du workflow").set_value("2020-02-01 03:00:00").run()
     widget(app.text_input, "Question documentaire du workflow").set_value("Motor_current").run()
-    widget(app.selectbox, "Origine déclarée des mesures du workflow").select("Synthétique (test)").run()
     widget(app.button, "Démarrer le workflow sur cette fenêtre").click().run(timeout=20)
     assert not app.exception
     run_id = app.session_state["workflow_active_id"]
+    assert services.decisions.get(run_id) is None
+    widget(app.radio, "Navigation").set_value("Gestion des interventions").run()
     assert widget(app.button, "Approuver").disabled
     assert widget(app.button, "Refuser").disabled
     assert widget(app.button, "Demander une révision").disabled
@@ -357,6 +360,7 @@ def test_streamlit_requires_manual_review_and_reopens_saved_thread(workflow_serv
     assert services.decisions.get(run_id) is None
     # Nouveau navigateur simulé : l'état est retrouvé dans SQLite, pas dans session_state.
     reopened = AppTest.from_file(app_path).run(timeout=15)
+    widget(reopened.radio, "Navigation").set_value("Gestion des interventions").run()
     widget(reopened.text_input, "Identifiant du dossier à rouvrir").set_value(run_id).run()
     widget(reopened.button, "Rouvrir le dossier enregistré").click().run()
     assert not reopened.exception and reopened.session_state["workflow_active_id"] == run_id
@@ -387,6 +391,24 @@ def test_a_forged_approval_in_a_checkpoint_is_not_exposed_as_valid(workflow_requ
         with pytest.raises(ValueError):
             runner.get_state(paused["run_id"])
     assert services.decisions.get(paused["run_id"]) is None
+
+
+def test_workflow_inventory_and_decision_history_are_bounded_and_validated(workflow_request, workflow_services, tmp_path):
+    services,_,_=workflow_services
+    with open_workflow(directory=tmp_path/'inventory',services=services) as runner:
+        assert runner.list_runs()==[]
+        paused=runner.start(workflow_request)
+        rows=runner.list_runs(limit=1)
+        assert len(rows)==1 and rows[0]['pending'] and rows[0]['run_id']==paused['run_id']
+        assert 'samples' not in rows[0] and 'request' not in rows[0]
+        runner.review(paused['run_id'],submission(paused,'request_revision'))
+        updated=runner.list_runs(limit=1)[0]
+        assert not updated['pending'] and updated['outcome']=='revision_requested'
+        records=runner.decisions.list_records(limit=1)
+        assert len(records)==1 and records[0]['review']['submission']['acknowledged'] is True
+        assert runner.decisions.list_records(offset=1)==[]
+        with pytest.raises(ValueError): runner.list_runs(limit=500)
+        with pytest.raises(ValueError): runner.decisions.list_records(limit=500)
 
 
 @pytest.mark.parametrize("case", ["no_receipt", "empty_receipt", "no_ack", "false_ack", "wrong_proposal", "wrong_decision", "wrong_validator", "wrong_comment", "wrong_time", "naive_time"])

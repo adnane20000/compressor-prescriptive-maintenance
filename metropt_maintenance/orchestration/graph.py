@@ -45,8 +45,9 @@ def build_workflow(*, checkpointer, services: WorkflowServices):
 
 class WorkflowRunner:
     """API locale : aucun appelant ne peut soumettre une validation dans l'état initial."""
-    def __init__(self, graph):
+    def __init__(self, graph, decisions=None):
         self.graph = graph
+        self.decisions = decisions
 
     def _config(self, run_id):
         if not isinstance(run_id, str) or not re.fullmatch(r"[a-f0-9]{32}", run_id):
@@ -76,6 +77,26 @@ class WorkflowRunner:
             values["decision"] = decision.model_dump(mode="json")
         return {**values, "pending_nodes": list(snapshot.next),
                 "interrupts": [{"id": item.id, "value": item.value} for item in snapshot.interrupts]}
+
+    def list_runs(self, *, limit=100) -> list[dict]:
+        """Lister les derniers dossiers SQLite sans garder leurs mesures brutes en mémoire."""
+        if not 1 <= limit <= 200:
+            raise ValueError("Choisir au plus 200 dossiers.")
+        saver = self.graph.checkpointer
+        saver.setup()
+        with saver.cursor(transaction=False) as cursor:
+            cursor.execute("SELECT thread_id, MAX(checkpoint_id) FROM checkpoints WHERE checkpoint_ns='' GROUP BY thread_id ORDER BY MAX(checkpoint_id) DESC LIMIT ?", (limit,))
+            identifiers = [row[0] for row in cursor.fetchall()]
+        rows = []
+        for run_id in identifiers:
+            state = self.get_state(run_id)
+            event = state.get("ml_event") or {}
+            decision = state.get("decision") or {}
+            rows.append({"run_id":run_id,"phase":state["phase"],"pending":bool(state["interrupts"]),
+                         "outcome":decision.get("outcome"),"available_at":event.get("available_at"),
+                         "data_context":state["request"]["data_context"],"simulation":(state.get("diagnostic") or {}).get("simulation"),
+                         "approval_allowed":(state.get("proposal") or {}).get("approval_allowed",False)})
+        return rows
 
     def review(self, run_id: str, submission: dict) -> dict:
         state = self.get_state(run_id)
@@ -120,6 +141,6 @@ def open_workflow(*, directory="data/local/workflow", model_path="models/isolati
     serializer = JsonPlusSerializer(pickle_fallback=False, allowed_json_modules=[], allowed_msgpack_modules=[])
     try:
         saver = SqliteSaver(connection, serde=serializer)
-        yield WorkflowRunner(build_workflow(checkpointer=saver, services=services))
+        yield WorkflowRunner(build_workflow(checkpointer=saver, services=services), services.decisions)
     finally:
         connection.close()

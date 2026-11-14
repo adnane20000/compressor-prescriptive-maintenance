@@ -7,6 +7,11 @@ les données insuffisantes ne sont jamais traitées comme normales.
 
 ## Fiche Streamlit
 
+La fiche et ses trois actions se trouvent dans **Gestion des interventions**.
+**Diagnostic agentique** présente l'analyse et permet de rejoindre cette fiche.
+Le parcours complet et sa validation actuelle sont décrits dans
+`docs/interface_streamlit.md`.
+
 La fiche présente l'identifiant du workflow et le statut de validation, puis :
 
 - les mesures fournies, leurs unités/agrégations, la fenêtre historique, le score
@@ -104,7 +109,8 @@ Le mécanisme est expliqué dans `docs/workflow_langgraph.md`.
 
 ## Vérifications
 
-Commande réellement exécutée : `python -m pytest` — **224 tests réussis**, dont
+À la livraison initiale de la supervision, commande réellement exécutée :
+`python -m pytest` — **224 tests réussis**, dont
 **57 tests du workflow, de la fiche et des décisions**. Les trois actions sont
 exercées via Streamlit AppTest, avec fermeture/réouverture du dossier. Les tests
 vérifient notamment :

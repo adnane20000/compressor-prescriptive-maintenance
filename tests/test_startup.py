@@ -14,10 +14,11 @@ def test_app_starts_without_api_key(monkeypatch) -> None:
     app = AppTest.from_file(str(entrypoint)).run(timeout=15)
 
     assert not app.exception, "L'application a levé une exception au démarrage."
-    assert app.title[0].value == "MetroPT — Maintenance prescriptive"
-    assert "aucune clé API nécessaire" in app.info[0].value
-    assert "diagnostic confirmé" in app.warning[0].value
-    assert "validation humaine" in app.warning[0].value
+    assert app.title[0].value == "Dashboard"
+    assert len(app.radio[0].options) == 5
+    assert any("aucune clé API nécessaire" in caption.value for caption in app.caption)
+    assert any("diagnostic confirmé" in caption.value for caption in app.caption)
+    assert any("Validation humaine" in caption.value for caption in app.caption)
 
 
 def _widget(widgets, label):
@@ -38,7 +39,7 @@ def test_dashboard_explores_manual_csv_and_replays_without_api(make_csv, tmp_pat
     assert not app.exception
     assert app.session_state["analysis"][0]["rows_analyzed"] == 3
     assert "PRÉFIXE LIMITÉ" in app.success[0].value
-    assert len(app.get("plotly_chart")) == 5
+    assert len(app.get("plotly_chart")) == 4
     assert (tmp_path / "data/local/exploration/report.html").exists()
     _widget(app.button, "Initialiser le rejeu").click().run()
     _widget(app.button, "Avancer dans le rejeu").click().run()
@@ -74,6 +75,7 @@ def test_dashboard_runs_ml_and_shows_scores(ml_measurements, ml_config, tmp_path
         return run_baseline(path, config=ml_config, chunksize=100)
     monkeypatch.setattr("metropt_maintenance.ml.workflow.run_baseline", small_baseline)
     app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py")).run(timeout=15)
+    _widget(app.radio, "Navigation").set_value("Détection d'anomalies").run()
     _widget(app.text_input, "Chemin du CSV local").set_value(str(path)).run()
     _widget(app.button, "Entraîner et évaluer Isolation Forest").click().run(timeout=30)
     assert not app.exception
@@ -90,14 +92,52 @@ def test_dashboard_indexes_pdf_searches_and_abstains(rag_corpus, rag_encoder, tm
     monkeypatch.setattr("metropt_maintenance.rag.index.default_encoder", lambda: rag_encoder)
     monkeypatch.setattr("metropt_maintenance.rag.search.default_encoder", lambda: rag_encoder)
     app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py")).run(timeout=15)
+    _widget(app.radio, "Navigation").set_value("Assistant RAG").run()
     _widget(app.text_input, "Dossier des PDF").set_value(str(directory)).run()
     _widget(app.button, "Indexer les PDF").click().run(timeout=20)
     assert not app.exception and app.session_state["rag_index_summary"]["pdf_count"] == 3
     _widget(app.text_input, "Question documentaire").set_value("AMDEC criticite effets").run()
     _widget(app.button, "Rechercher dans les documents").click().run()
     assert not app.exception
+    assert "rag_result" in app.session_state, [error.value for error in app.error]
     assert app.session_state["rag_result"].passages[0].authority == "pedagogical"
     _widget(app.text_input, "Question documentaire").set_value("Quel couple de serrage pour la culasse ?").run()
     _widget(app.button, "Rechercher dans les documents").click().run()
     assert not app.exception
     assert app.session_state["rag_result"].message == "information insuffisante"
+
+
+def test_all_five_pages_handle_missing_local_artifacts(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/"app.py")).run(timeout=15)
+    for page in ["Dashboard","Détection d'anomalies","Assistant RAG","Diagnostic agentique","Gestion des interventions"]:
+        _widget(app.radio,"Navigation").set_value(page).run(timeout=15)
+        assert not app.exception, page
+        assert app.title[0].value==page
+    assert any("Aucune décision enregistrée" in item.value for item in app.info)
+    assert all(button.label!='Approuver' for button in app.button)
+
+
+def test_synthetic_demo_is_explicit_and_replay_survives_navigation(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/"app.py")).run(timeout=15)
+    _widget(app.button,"Créer un exemple synthétique").click().run()
+    assert not app.exception
+    assert any("DONNÉES SYNTHÉTIQUES" in warning.value for warning in app.warning)
+    _widget(app.text_input,"Début du rejeu (facultatif, AAAA-MM-JJ HH:MM:SS)").set_value("2020-01-01 00:03:00").run()
+    _widget(app.button,"Initialiser le rejeu").click().run()
+    _widget(app.button,"Avancer dans le rejeu").click().run()
+    assert len(app.session_state['replay_rows'])==1
+    _widget(app.radio,"Navigation").set_value("Assistant RAG").run()
+    _widget(app.radio,"Navigation").set_value("Dashboard").run()
+    assert not app.exception and len(app.session_state['replay_rows'])==1
+    assert _widget(app.text_input,"Début du rejeu (facultatif, AAAA-MM-JJ HH:MM:SS)").value=="2020-01-01 00:03:00"
+
+
+def test_corrupt_model_metrics_are_reported_without_crashing(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    root=tmp_path/'data/local/ml_baseline'; root.mkdir(parents=True)
+    (root/'metrics.json').write_text('not JSON')
+    app=AppTest.from_file(str(Path(__file__).resolve().parents[1]/"app.py")).run(timeout=15)
+    _widget(app.radio,"Navigation").set_value("Détection d'anomalies").run()
+    assert not app.exception and any("Résultats ML illisibles" in item.value for item in app.error)

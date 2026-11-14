@@ -240,6 +240,7 @@ def test_streamlit_connects_ml_event_and_rag_passages_in_mock(diagnostic_inputs,
                      "document_type", "publisher", "source_url", "authority_basis", "applicability", "equipment_reference")})
     app.session_state["rag_result"] = SimpleNamespace(passages=[hit], related_passages=[], reason="retrieval_only",
                                                     question="Question synthétique", message="passages", warnings=[])
+    next(widget for widget in app.radio if widget.label == "Navigation").set_value("Diagnostic agentique").run()
     button = lambda label: next(widget for widget in app.button if widget.label == label)
     button("Utiliser la première alerte ML disponible").click().run()
     button("Générer le diagnostic préliminaire").click().run()

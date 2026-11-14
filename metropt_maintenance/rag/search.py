@@ -12,6 +12,7 @@ from .documents import AUTHORITIES, OPERATIONAL_TYPES, pdf_inventory
 from .embeddings import default_encoder
 from .index import INDEX_VERSION, chroma_client, read_manifest, registry_hash
 from .safety import SAFETY_NOTICE, assess_safety_request
+from ..ingestion.schema import SIGNAL_NAMES
 
 STOPWORDS = set("a au aux avec ce ces cet cette comme comment dans de des du en est et etre font for from how il ils is la le les leur leurs lui ne nous on ou par pas pour que quel quelle quelles quels qui se selon sont sur the to un une units what when where which pourquoi pouvez donner donne veuillez please does do are can could would expliquer explique signifie definition document documents pdf page pages".split())
 STOPWORDS.update("in of by at an it its as about into with be been being this that these those their them our your we you they than then through".split())
@@ -24,13 +25,14 @@ SYNONYMS.update({"secher": "dry", "sechage": "dry", "drying": "dry", "dryer": "d
                  "condensats": "condensate", "condensates": "condensate", "fuites": "leak", "leaks": "leak"})
 TOPIC_STOPWORDS = set("guide manuel manual sourcebook air compressed comprime compressor compresseurs system systeme nasa doe atlas copco kaeser according".split())
 SOURCE_ALIASES = {"nasa": ("nasa", "aeronautics"), "doe": ("department of energy",),
-                  "kaeser": ("kaeser",), "atlas": ("atlas copco",), "copco": ("atlas copco",), "inrs": ("inrs",)}
-TOPIC_STOPWORDS.add("inrs")
+                  "kaeser": ("kaeser",), "atlas": ("atlas copco",), "copco": ("atlas copco",), "inrs": ("inrs",), "uci": ("uci",)}
+TOPIC_STOPWORDS.update(("inrs", "uci"))
 OPERATIONAL_TERMS = set("procedure procedures securite safety urgence emergency consignation lockout serrage torque couple demonter demontage reparer reparation repair replacement replace disassemble disconnect debrancher isolate consigner intervention intervenir remplacement remplacer constructeur manufacturer maximale maximal maximum limite autorisee admissible".split())
 CRITICAL_GROUPS = (
     {"serrage", "torque"}, {"consignation", "lockout"}, {"urgence", "emergency"},
     {"maximale", "maximal", "maximum", "limite", "admissible", "autorisee"},
     {"residuel", "residuels", "residuelle", "residuelles", "residual", "residuals"},
+    {"temperature", "temperatures"},
 )
 
 
@@ -39,6 +41,11 @@ def query_terms(text: str) -> set[str]:
     normalized = "".join(character for character in unicodedata.normalize("NFKD", text.lower()) if not unicodedata.combining(character))
     words = re.findall(r"[a-z0-9]+", normalized)
     return {SYNONYMS.get(word, word) for word in words if len(word) >= 2 and word not in STOPWORDS}
+
+
+def signal_pattern(name: str) -> str:
+    """Relier le nom CSV à son libellé PDF espacé, sans changer les lettres du signal."""
+    return r"(?<!\w)" + r"[\s_]+".join(re.escape(part) for part in name.split("_")) + r"(?!\w)"
 
 
 @dataclass(frozen=True)
@@ -60,6 +67,7 @@ class Passage:
     applicability: str = "not_verified"
     equipment_reference: str = ""
     text_is_untrusted_data: bool = True
+    retrieval_basis: str = "semantic_and_lexical_guards"
 
 
 @dataclass
@@ -129,6 +137,7 @@ def search_documents(
     vector = vector / np.linalg.norm(vector)
     conditions = [{"authority": authority}] if authority != "all" else []
     requested_sources = terms & SOURCE_ALIASES.keys()
+    explicit_signals = [name for name in SIGNAL_NAMES if re.search(signal_pattern(name), question, re.I)]
     if requested_sources:
         paths = [document["relative_path"] for document in manifest["documents"]
                  if any(alias in (document["title"] + " " + document["publisher"] + " " + document["relative_path"]).lower()
@@ -152,7 +161,15 @@ def search_documents(
         matched = terms & passage_terms
         critical_covered = all(not (terms & group) or bool(passage_terms & group) for group in CRITICAL_GROUPS)
         navigation = bool(re.search(r"\.{5,}", text)) and not (terms & {"sommaire", "contents"})
-        if similarity < min_similarity or not matched or not critical_covered or navigation or (topics and not topics.intersection(passage_terms)):
+        exact_signal = any(re.search(signal_pattern(name), text, re.I) for name in explicit_signals)
+        if explicit_signals and not exact_signal:
+            continue
+        # Une définition de variable explicitement demandée à UCI peut être
+        # retrouvée par son identifiant littéral. Ce n'est pas un seuil ML abaissé
+        # ni une validation de procédure ; les garde-fous de type restent appliqués.
+        exact_dataset_lookup = bool("uci" in requested_sources and exact_signal and metadata["authority"] == "official"
+                                    and metadata["document_type"] == "dataset_description")
+        if (similarity < min_similarity and not exact_dataset_lookup) or not matched or not critical_covered or (navigation and not exact_dataset_lookup) or (topics and not topics.intersection(passage_terms)):
             continue
         if known.get(metadata["relative_path"]) != metadata["pdf_sha256"] or metadata["page"] < 1:
             raise ValueError("Référence hors de l'inventaire actif.")
@@ -168,6 +185,7 @@ def search_documents(
             authority_basis=metadata["authority_basis"], similarity=similarity, matched_query_terms=sorted(matched),
             applicability=metadata.get("applicability", "not_verified"),
             equipment_reference=metadata.get("equipment_reference", ""),
+            retrieval_basis="exact_dataset_signal_and_requested_publisher" if exact_dataset_lookup else "semantic_and_lexical_guards",
         )
         project_matched = (hit.applicability == "equipment_specific" and
                            any(term.startswith("metropt") for term in query_terms(hit.equipment_reference)))
@@ -176,6 +194,8 @@ def search_documents(
         else:
             accepted.append(hit)
     warnings = list(manifest["warnings"])
+    if any(hit.retrieval_basis == "exact_dataset_signal_and_requested_publisher" for hit in accepted + related):
+        warnings.append("Définition de dataset retrouvée par nom exact du signal et éditeur UCI demandé ; aucune procédure de maintenance n'est validée.")
     if any(hit.applicability != "equipment_specific" for hit in accepted + related):
         warnings.append("Référence générale ou portée non vérifiée : aucune applicabilité au compresseur MetroPT-3 n'est établie.")
     if not accepted:

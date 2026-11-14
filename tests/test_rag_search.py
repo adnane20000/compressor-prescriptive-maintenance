@@ -62,6 +62,49 @@ def test_source_filters_do_not_invent_missing_publisher(rag_index):
     assert result.reason == "requested_source_missing" and not result.passages
 
 
+def test_temperature_question_excludes_generic_oil_passages(tmp_path, rag_encoder):
+    docs=tmp_path/'docs'; docs.mkdir()
+    with pymupdf.open() as pdf:
+        pdf.new_page().insert_text((40,50),'Oil is used in photo laboratories. General introduction.')
+        pdf.new_page().insert_text((40,50),'Oil temperature is measured in degrees Celsius. SYNTHETIC TEST.')
+        pdf.save(docs/'synthetic.pdf')
+    index=tmp_path/'index'
+    index_documents(docs,index_directory=index,encoder=rag_encoder)
+    result=search_documents("Quelle temperature pour l'huile ?",index_directory=index,encoder=rag_encoder)
+    assert result.passages and all(hit.page==2 for hit in result.passages)
+
+
+def test_uci_filter_uses_declared_provenance_not_pdf_claims(rag_index):
+    directory,index,encoder=rag_index
+    registry=json.loads((directory/'sources.json').read_text())
+    registry['documents']['description_test.pdf']['publisher']='UCI — attribution SYNTHETIQUE pour test'
+    (directory/'sources.json').write_text(json.dumps(registry))
+    index_documents(directory,index_directory=index,encoder=encoder)
+    result=search_documents('Selon UCI que mesure Motor_current ?',index_directory=index,encoder=encoder)
+    assert result.passages and all(hit.file_name=='description_test.pdf' for hit in result.passages)
+    exact=search_documents('Selon UCI que mesure Motor_current ?',index_directory=index,encoder=encoder,min_similarity=1.0)
+    assert exact.passages and exact.passages[0].retrieval_basis=='exact_dataset_signal_and_requested_publisher'
+    assert any('nom exact' in warning for warning in exact.warnings)
+    unsupported=search_documents('Selon UCI quelle limite maximale admissible pour Motor_current sur MetroPT ?',index_directory=index,encoder=encoder,min_similarity=1.0)
+    assert unsupported.message=='information insuffisante'
+
+
+def test_exact_dataset_lookup_accepts_pdf_spaces_without_renaming_csv_signals(tmp_path, rag_encoder):
+    from metropt_maintenance.rag.documents import file_sha256
+    docs=tmp_path/'docs'; docs.mkdir()
+    path=docs/'dataset_SYNTHETIQUE.pdf'
+    with pymupdf.open() as pdf:
+        pdf.new_page().insert_text((40,50),'DONNEES SYNTHETIQUES. Oil Temperature (C) is a sensor measurement.')
+        pdf.save(path)
+    entry={'authority':'official','document_type':'dataset_description','sha256':file_sha256(path),
+           'publisher':'UCI — attribution SYNTHETIQUE de test','source_url':'https://example.invalid/test'}
+    (docs/'sources.json').write_text(json.dumps({'version':1,'documents':{path.name:entry}}))
+    index=tmp_path/'index'; index_documents(docs,index_directory=index,encoder=rag_encoder)
+    result=search_documents('Selon UCI, unité de Oil_temperature ?',index_directory=index,encoder=rag_encoder,min_similarity=1.0)
+    assert result.passages and 'Oil Temperature' in result.passages[0].text
+    assert result.passages[0].retrieval_basis=='exact_dataset_signal_and_requested_publisher'
+
+
 def test_residual_energy_query_does_not_return_generic_risk_frontmatter(tmp_path, rag_encoder):
     docs = tmp_path / "docs"
     docs.mkdir()

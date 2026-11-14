@@ -1,0 +1,50 @@
+{
+  "scope": "Validation de l’interface ; aucune mesure de performance générale ML ou RAG",
+  "runtime": {
+    "streamlit": "1.67.0",
+    "plotly": "6.9.0"
+  },
+  "pytest": {
+    "command": "python -m pytest",
+    "passed": 245,
+    "failed": 0,
+    "remote_service_required": false
+  },
+  "pip_check": {
+    "command": "python -m pip check",
+    "incompatibilities": 0
+  },
+  "streamlit_health": {
+    "port": 8501,
+    "http_status": 200
+  },
+  "browser_checks": {
+    "browser": "Chromium + Playwright",
+    "five_pages": true,
+    "historical_replay_verified": true,
+    "real_ml_artifacts_displayed": true,
+    "real_pdf_rag_mock_answer": true,
+    "real_workflow_paused_for_human_review": true,
+    "review_submitted": false,
+    "approval_buttons_disabled": true,
+    "mobile_no_horizontal_overflow": true,
+    "javascript_errors": [],
+    "real_llm_api_called": false
+  },
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 1100
+    },
+    {
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "human_review": "Aucune soumission sur les dossiers réels ; validations unitaires exclusivement synthétiques",
+  "limitations": [
+    "Pas d’appel à une API LLM réelle",
+    "Citations documentaires sélectionnées, sans procédure libre",
+    "Pas d’authentification industrielle du validateur"
+  ]
+}

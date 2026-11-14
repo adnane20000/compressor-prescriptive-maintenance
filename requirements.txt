@@ -1,5 +1,5 @@
 # Dépendances : acquisition, ML, RAG, diagnostic et workflow LangGraph (Python 3.11 ou 3.12).
-streamlit>=1.40,<2.0
+streamlit>=1.50,<2.0
 pytest>=8.3,<9.0
 pandas>=2.2,<4.0
 numpy>=1.26,<3.0

@@ -5,7 +5,9 @@
 La chaîne lit les PDF de `documents/`, extrait le texte avec PyMuPDF, découpe des
 passages, les encode avec Sentence Transformers et les stocke dans ChromaDB.
 `search_documents(question)` retourne les passages et leurs références.
-Le module RAG ne génère pas de réponse LLM. Le module distinct `diagnostic`
+La fonction de recherche ne génère pas de réponse LLM. La page Assistant RAG
+ajoute une sélection de citations vérifiées via `generate_document_answer` ;
+voir `docs/interface_streamlit.md`. Le module distinct `diagnostic`
 consomme ses passages vérifiés pour un diagnostic préliminaire structuré ;
 voir `docs/diagnostic_preliminaire.md`. Aucun agent autonome n'est ajouté.
 
@@ -18,6 +20,17 @@ ouvrages généraux ont été importés ; leur provenance, leur portée et leurs
 sont décrits dans `docs/rag_corpus_import.md`. Cette section conserve les mesures
 historiques sur le seul PDF UCI, sans les extrapoler au corpus étendu.
 Les deux guides INRS ajoutés ensuite sont décrits dans `docs/inrs_safety_import.md`.
+
+Les questions contenant un nom exact de signal doivent retrouver ce nom dans
+le passage, en reconnaissant les espaces et tirets bas équivalents :
+`Oil_temperature` dans le CSV correspond à « Oil Temperature » dans le PDF UCI.
+Les demandes de température exigent l'ancre correspondante, afin
+d'écarter les passages parlant seulement d'huile. Une définition explicitement
+demandée à UCI peut être retrouvée par le nom littéral du signal dans une
+description de dataset officielle déclarée, même sous le seuil sémantique.
+Le passage signale alors `retrieval_basis=exact_dataset_signal_and_requested_publisher`.
+Cette voie lexicale conserve les garde-fous de type : elle ne permet jamais
+de valider une procédure de maintenance avec une description de dataset.
 
 Empreinte du PDF :
 
