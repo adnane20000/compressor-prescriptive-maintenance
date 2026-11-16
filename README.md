@@ -552,7 +552,7 @@ Le journal utilise des dates UTC explicites ; le fuseau des mesures MetroPT rest
 non documenté. Aucun client ou secret LLM n'est stocké dans les checkpoints et
 le traçage distant LangSmith est désactivé dans l'API du workflow.
 
-**Validation exécutée : 245 tests réussis**, dont 58 tests du workflow et de sa
+**À la livraison de l'interface : 245 tests réussis**, dont 58 tests du workflow et de sa
 persistance. Un essai distinct sur 45 mesures réelles a retrouvé l'anomalie de la
 minute close à 04:15 le 1er mars 2020, puis les passages DOE. Le diagnostic mock
 a été conservé et le checkpoint rouvert ; le dossier reste **en attente**, sans
@@ -567,6 +567,7 @@ app.py                          point d'entrée Streamlit
 metropt_maintenance/
   ui.py                         cinq pages, navigation et fiche de revue
   presentation.py               lectures bornées, démonstration et graphiques Plotly
+  evaluation/                   scénarios, ablations A/B/C et rapports mesurés
   ingestion/
     schema.py                   dictionnaire des 15 signaux et unités
     acquisition.py              téléchargement officiel en flux
@@ -636,6 +637,32 @@ Streamlit via AppTest. Le CSV réel n'est jamais traité automatiquement par Pyt
 L'analyse complète du CSV officiel a été exécutée séparément ; ses résultats
 sont expliqués dans `docs/exploration_metropt3.md`. Le rapport généré est dans
 `data/local/metropt3_official/report.html`.
+
+## Campagne d'évaluation complète
+
+Les dix scénarios et les trois configurations sont exécutables sans API LLM :
+
+```bash
+python -m pytest --junitxml=data/local/evaluation_tests.xml
+python -m metropt_maintenance.evaluation --real --repeats 3 \
+  --junit data/local/evaluation_tests.xml
+```
+
+Omettre `--real` pour ne lancer que les scénarios synthétiques. Le volet réel
+requiert les artefacts CSV/ML/RAG locaux déjà préparés. Le même mock est imposé
+pour A (LLM seul), B (LLM + RAG) et C (ML + RAG + LangGraph) : cette comparaison
+évalue les contrats et capacités, sans prétendre mesurer le raisonnement d'un
+LLM réel. Les décisions simulées utilisent un stockage séparé ; aucun dossier
+réel n'est approuvé par la campagne.
+
+Le rapport HTML autonome avec graphiques et tableaux est généré dans
+`data/local/evaluation/report/rapport.html`, accompagné du Markdown et du JSON.
+Protocole : [docs/evaluation/README.md](docs/evaluation/README.md).
+Résultats exécutés : [docs/evaluation/rapport.md](docs/evaluation/rapport.md).
+Les limites et scénarios non satisfaits sont publiés ; Precision, Recall de
+défaillance, F1 et qualité clinique restent NA sans références suffisantes.
+La campagne exécutée comprend **258 tests automatisés réussis**, **90 cas
+simulés** et **18 parcours sur mesures historiques**, avec générations mock.
 
 ## Suite du projet
 
